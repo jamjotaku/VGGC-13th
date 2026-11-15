@@ -1,0 +1,3721 @@
+<template>
+<div class="font-sans bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden" :class="activeTab === 'register' ? 'pt-0 pb-0' : 'pt-12 md:pt-11 pb-14 md:pb-0'">
+
+    <!-- ★ PWA自動更新＆オフライン通知トースト -->
+    <PwaUpdateToast />
+
+    <!-- ナビゲーションバー (レジモード時は非表示にして全画面化) -->
+    <nav v-show="activeTab !== 'register'" class="bg-white shadow-sm border-b px-3 md:px-4 py-2 md:py-2.5 flex justify-between items-center z-20 flex-shrink-0">
+      <div class="font-bold text-base md:text-lg flex items-center gap-2">
+        VGGC 12th 
+        <span v-if="isReadOnly" class="text-[10px] md:text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full font-bold">閲覧専用</span>
+        <!-- 全員に見えるオフライン/圏外インジケーター -->
+        <span v-if="!isOnline" class="text-[10px] md:text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm" title="圏外（保存済みデータで動作中）">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+          <span>圏外(保存済)</span>
+        </span>
+      </div>
+      <div class="flex items-center gap-1.5 md:gap-3">
+        <!-- ★ お知らせ・タイムライン通知ボタン (未読赤丸バッジ付き) -->
+        <button @click="showNotificationModal = true" 
+                class="relative p-1 md:p-1.5 text-gray-600 hover:bg-gray-100 rounded-full transition cursor-pointer" 
+                title="お知らせ・タイムライン通知">
+          <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span v-if="unreadNotificationsCount > 0" 
+                class="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
+        </button>
+
+        <!-- ヘルプボタン -->
+        <button @click="showHelpModal = true" class="p-1 md:p-1.5 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer" title="ヘルプ・免責事項">
+          <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </button>
+
+        <button v-if="isReadOnly" @click="exitReadOnly" class="text-xs md:text-sm bg-gray-800 text-white px-2 md:px-3 py-1.5 rounded-lg hover:bg-gray-700 transition cursor-pointer">
+          <span class="hidden md:inline">自分のリストへ戻る</span>
+          <span class="md:hidden">戻る</span>
+        </button>
+        
+        <template v-if="!user && !isReadOnly">
+          <button @click="showAuthModal = true" class="text-xs md:text-sm bg-blue-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-sm flex items-center gap-1 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+            <span class="hidden sm:inline">ログイン / 同期</span>
+            <span class="sm:hidden">ログイン</span>
+          </button>
+        </template>
+        
+        <template v-if="user && !isReadOnly">
+          <div class="flex items-center gap-1.5 md:gap-3">
+            <div class="flex items-center gap-1 bg-gray-50 border border-gray-100 px-1.5 md:px-2 py-1 rounded-md">
+              <span class="text-[10px] md:text-xs font-bold text-gray-600 max-w-[60px] md:max-w-[100px] truncate">{{ user.email.split('@')[0] }}</span>
+              <span v-if="!isOnline" class="text-[10px] text-red-500 font-bold px-0.5" title="圏外（データは端末内に保存されています）">圏外</span>
+              <template v-else>
+                <span v-if="isSaving" class="text-[10px] text-gray-400" title="保存中">
+                  <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                </span>
+                <span v-else class="text-[10px] text-green-500" title="保存完了">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                </span>
+              </template>
+            </div>
+            <button @click="showShareModal = true" class="text-xs md:text-sm bg-pink-50 text-pink-600 border border-pink-200 p-1.5 md:px-3 md:py-1.5 rounded-lg hover:bg-pink-100 transition flex items-center gap-1 font-bold cursor-pointer" title="共有">
+              <svg class="h-4 w-4 md:h-4 md:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+              <span class="hidden md:inline">共有</span>
+            </button>
+            <button @click="signOut" class="text-gray-500 hover:text-gray-800 p-1.5 md:p-0 transition flex items-center gap-1 cursor-pointer" title="ログアウト">
+              <svg class="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+              <span class="text-xs underline hidden md:block">ログアウト</span>
+            </button>
+          </div>
+        </template>
+      </div>
+    </nav>
+
+    <!-- 緊急お知らせバナー (urgent未読時のみ自動表示) -->
+    <div v-if="urgentNotification" 
+         @click="showNotificationModal = true"
+         class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 text-xs font-bold flex items-center justify-between cursor-pointer transition z-20 shrink-0 shadow-sm animate-pulse">
+      <div class="flex items-center gap-2 truncate">
+        <span class="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">🚨 緊急</span>
+        <span class="truncate">{{ urgentNotification.title }}</span>
+      </div>
+      <span class="text-[10px] bg-white/25 hover:bg-white/35 px-2 py-0.5 rounded-full shrink-0">確認する →</span>
+    </div>
+
+    <!-- 11/14 当日カウントダウン ＆ 進行状況バー（全画面共通・アコーディオン展開対応 / レジモード時は非表示） -->
+    <EventCountdownBar v-show="activeTab !== 'register'" :countdown="eventCountdown" :is-current-schedule="isCurrentSchedule" />
+
+    <!-- メインレイアウト -->
+    <div class="flex-1 flex overflow-hidden bg-gray-100 min-h-0">
+      
+      <!-- =========================================
+           左側：マップ ＆ クイックナビエリア (PC専用・マップ表示領域最大化 / レジタブ時は非表示にしてタブレット横画面100%幅をレジに開放)
+      ========================================== -->
+      <div v-show="activeTab !== 'register'" class="hidden md:flex w-5/12 lg:w-[44%] xl:w-[42%] flex-col bg-white border-r border-gray-200 shadow-sm h-full overflow-hidden p-3.5 gap-2">
+        <!-- マップヘッダー -->
+        <div class="flex justify-between items-center gap-2 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <h1 class="text-base font-extrabold text-gray-800 flex items-center gap-1.5 shrink-0">
+              <span>🗺️</span>
+              <span>会場マップ</span>
+            </h1>
+            <span v-if="targetSpace && !focusedMapCircle" class="text-xs font-bold bg-pink-100 text-pink-800 border border-pink-200 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs truncate">
+              <span class="truncate">📍 {{ targetSpace }}</span>
+              <button @click="clearMapFocus" class="hover:text-pink-950 ml-0.5 cursor-pointer" title="ターゲットピンを消す">×</button>
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <!-- 公式会場マップPDFリンク -->
+            <a href="/map.pdf" target="_blank" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg flex items-center gap-1 transition shadow-xs" title="公式会場マップPDFを開く / 印刷・保存">
+              <span>📄 PDF ↗</span>
+            </a>
+
+            <!-- ★ 巡回ルート描画 ON/OFF トグル -->
+            <button @click="toggleRouteOverlay"
+                    class="text-[11px] font-extrabold px-2.5 py-1 rounded-lg border transition flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                    :class="showRouteOverlay ? 'bg-rose-600 text-white border-rose-700 ring-2 ring-rose-200' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'"
+                    title="入口起点・通路グラフ沿いの巡回ルート線と訪問順番号を表示">
+              <span>🧭 ルート: {{ showRouteOverlay ? 'ON' : 'OFF' }}</span>
+              <span v-if="showRouteOverlay && activePatrolRoute.orderedStops.length > 0" class="px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono">{{ activePatrolRoute.orderedStops.length }}</span>
+            </button>
+
+            <!-- 買物中マップモード ON/OFF トグル (リスト登録サークルを発光強調) -->
+            <button @click="toggleShoppingMapMode"
+                    class="text-[11px] font-extrabold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                    :class="isShoppingMapMode ? 'bg-pink-600 text-white border-pink-700 ring-2 ring-pink-300 animate-pulse' : 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100'"
+                    title="買い物リストに入れたサークルをマップ上で大きく発光させ、買い回りやすくする専用モード">
+              <span>📍 買物中: {{ isShoppingMapMode ? 'ON' : 'OFF' }}</span>
+            </button>
+
+            <!-- 買い物リストプロット ON/OFF トグル -->
+            <button @click="showListPins = !showListPins"
+                    class="text-[11px] font-extrabold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                    :class="showListPins ? 'bg-slate-800 text-white border-slate-900' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'">
+              <span>🛒 リスト表示: {{ showListPins ? 'ON' : 'OFF' }}</span>
+              <span v-if="showListPins" class="px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono">{{ activeListMapPins.length }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4原色カラー凡例バー (リスト表示ON時) -->
+        <div v-if="showListPins" class="flex items-center justify-between px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-lg text-[11px] font-bold text-slate-700 shrink-0 gap-2">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block ring-1 ring-red-900"></span>S:最優先</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block ring-1 ring-yellow-800"></span>A:買いたい</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block ring-1 ring-blue-900"></span>B:見に行く</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block ring-1 ring-emerald-900"></span>未設定</span>
+          </div>
+          <button @click="showCompletedPins = !showCompletedPins"
+                  class="text-[10px] px-1.5 py-0.5 rounded border transition shrink-0 cursor-pointer"
+                  :class="showCompletedPins ? 'bg-slate-200 text-slate-800 border-slate-300 font-bold' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'"
+                  title="購入済・完売サークルのドット表示切り替え">
+            {{ showCompletedPins ? '✓ 済も薄く表示中' : '済・完売は自動消去' }}
+          </button>
+        </div>
+
+        <!-- ★ 巡回ルート設定＆計画ルート注記バー (PC: ルート表示ON時) -->
+        <div v-if="showRouteOverlay" class="px-2.5 py-1.5 bg-rose-50/80 border border-rose-200 rounded-lg text-[11px] text-slate-700 shrink-0 space-y-1">
+          <div class="flex items-center justify-between gap-1.5 flex-wrap">
+            <!-- 巡回順切替: 優先度順(デフォルト) / 最短順 -->
+            <div class="flex items-center gap-1">
+              <span class="font-extrabold text-rose-900">順路:</span>
+              <div class="inline-flex rounded-md bg-white p-0.5 border border-rose-200 shadow-2xs">
+                <button type="button" @click="routeOrderMode = 'priority'"
+                        class="px-2 py-0.5 rounded text-[10px] font-extrabold transition cursor-pointer"
+                        :class="routeOrderMode === 'priority' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-rose-50'"
+                        title="優先度 S→A→B→未 の大枠を守り、各優先度内を最短化（完売リスク回避）">
+                  優先度順
+                </button>
+                <button type="button" @click="routeOrderMode = 'shortest'"
+                        class="px-2 py-0.5 rounded text-[10px] font-extrabold transition cursor-pointer"
+                        :class="routeOrderMode === 'shortest' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-rose-50'"
+                        title="優先度を問わず会場入口から全体を最短距離で一筆書き巡回">
+                  最短順
+                </button>
+              </div>
+            </div>
+
+            <!-- 対象フィルタ (未購入すべて / Sのみ / S+A) -->
+            <div class="flex items-center gap-1">
+              <select v-model="routeTargetFilter" class="h-6 text-[10px] font-extrabold bg-white border border-rose-200 rounded px-1.5 text-slate-800 cursor-pointer outline-none">
+                <option value="all">対象: 未購入すべて</option>
+                <option value="S">対象: S(最優先)のみ</option>
+                <option value="SA">対象: S + A のみ</option>
+                <option value="include_done">対象: 購入済も含む</option>
+              </select>
+
+              <!-- 入口に戻るオプション -->
+              <label class="h-6 px-1.5 bg-white border border-rose-200 rounded flex items-center gap-1 text-[10px] font-extrabold text-slate-700 cursor-pointer select-none hover:bg-rose-50"
+                     title="最後のサークル訪問後に起点（入口）へ戻るルートを追加表示">
+                <input type="checkbox" v-model="routeReturnToEntrance" class="accent-rose-600 w-3 h-3">
+                <span>入口に戻る</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 text-[10px] text-slate-500">
+            <span v-if="activePatrolRoute.orderedStops.length > 0" class="font-bold text-rose-800">
+              ★入口 → {{ activePatrolRoute.orderedStops.length }}件巡回 (距離: {{ Math.round(activePatrolRoute.totalDistance) }})
+            </span>
+            <span v-else class="text-slate-500">※買い物リストに未購入サークルを追加するとルートが描画されます</span>
+            <span class="text-[10px] text-slate-500 truncate" title="計画用ルートのため、当日の混雑・一方通行規制時は現地のスタッフ誘導に従ってください">
+              ※計画用ルート（混雑・一方通行時は現地誘導優先）
+            </span>
+          </div>
+        </div>
+
+        <!-- PC用マップビューポートラッパー (ズームボタンとアクションバーをスクロール領域外に固定) -->
+        <div class="relative flex-1 min-h-[220px] flex flex-col rounded-xl border border-gray-200 bg-white shadow-inner overflow-hidden">
+          <!-- 固定ズームコントロール (スクロールしても常に右下に固定・アクションバーまたはピルバー表示時は自動で上に退避) -->
+          <div class="absolute right-3 flex flex-col gap-1.5 z-20 transition-all duration-200"
+               :class="(focusedMapCircle || (isShoppingMapMode && unboughtListMapPins.length > 0)) ? 'bottom-16' : 'bottom-3'">
+            <button @click="changeMapScale(0.25)" class="w-9 h-9 bg-white/95 shadow-md rounded-xl flex items-center justify-center text-gray-700 font-bold border border-gray-200 active:scale-95 hover:bg-gray-50 transition cursor-pointer" title="拡大 (Ctrl+ホイール)">＋</button>
+            <button @click="mapScale = 1.0" class="w-9 h-7 bg-white/95 shadow-md rounded-xl flex items-center justify-center text-[10px] text-gray-600 font-bold border border-gray-200 active:scale-95 hover:bg-gray-50 transition cursor-pointer" title="100%にリセット">{{ Math.round(mapScale * 100) }}%</button>
+            <button @click="changeMapScale(-0.25)" class="w-9 h-9 bg-white/95 shadow-md rounded-xl flex items-center justify-center text-gray-700 font-bold border border-gray-200 active:scale-95 hover:bg-gray-50 transition cursor-pointer" title="縮小 (Ctrl+ホイール)">－</button>
+          </div>
+
+          <!-- スクロール領域本体 -->
+          <div class="map-container flex-1 w-full h-full"
+               @wheel="handleMapWheel"
+               @mousedown="startMapPan"
+               @mousemove="moveMapPan"
+               @mouseup="endMapPan"
+               @mouseleave="endMapPan">
+            <div class="map-inner"
+                 :class="isPanningMap ? 'cursor-grabbing' : 'cursor-grab'"
+                 @mousedown="handleMapPointerDown"
+                 @touchstart.passive="handleMapPointerDown"
+                 @click="handleMapClick"
+                 @touchmove="dragPin" @mousemove="dragPin" @mouseup="stopDrag" @mouseleave="stopDrag" @touchend="stopDrag">
+              <img v-if="!isMapImageError"
+                   src="/map.jpg"
+                   alt="会場マップ"
+                   class="map-image"
+                   loading="lazy"
+                   :style="{ width: (900 * mapScale) + 'px' }"
+                   @error="isMapImageError = true">
+              <!-- マップ画像ロード失敗時のフォールバック案内 (PC) -->
+              <div v-else class="flex flex-col items-center justify-center p-8 text-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl m-6 space-y-3">
+                <div class="text-3xl">🗺️</div>
+                <p class="text-sm font-bold text-gray-700">会場マップ画像の取得に失敗しました</p>
+                <p class="text-xs text-gray-500">オフラインキャッシュが未完了の場合は公式PDFマップもご利用いただけます。</p>
+                <div class="flex items-center gap-2">
+                  <button @click="retryMapImage" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow hover:bg-blue-700 cursor-pointer">再試行</button>
+                  <a href="/map.pdf" target="_blank" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-300">📄 PDFマップを開く</a>
+                </div>
+              </div>
+
+              <!-- ★ 巡回ルート SVG オーバーレイ (PC: 座標系900×400.78125完全一致・通路ホワイトリスト描画) -->
+              <svg v-if="showRouteOverlay && activePatrolRoute.orderedStops.length > 0 && !isMapImageError"
+                   class="map-route-svg pointer-events-none select-none"
+                   viewBox="0 0 900 400.78125"
+                   preserveAspectRatio="none">
+                <!-- 各ブース前面アクセス点からブース端への短い引き出し線 -->
+                <line v-for="stop in activePatrolRoute.orderedStops"
+                      :key="'pc_rt_tick_'+stop.circle_id"
+                      :x1="stop.ax" :y1="stop.ay"
+                      :x2="stop.fx" :y2="stop.fy"
+                      stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" opacity="0.9" />
+                <line v-for="stop in activePatrolRoute.orderedStops"
+                      :key="'pc_rt_tick_fg_'+stop.circle_id"
+                      :x1="stop.ax" :y1="stop.ay"
+                      :x2="stop.fx" :y2="stop.fy"
+                      stroke="#e11d48" stroke-width="1.6" stroke-dasharray="2 1.5" stroke-linecap="round" opacity="0.9" />
+
+                <!-- 入口へ戻るオプション経路 (破線) -->
+                <template v-if="routeReturnToEntrance && activePatrolRoute.returnPolylinePoints.length > 1">
+                  <polyline :points="formatSvgPoints(activePatrolRoute.returnPolylinePoints)"
+                            fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.88" />
+                  <polyline :points="formatSvgPoints(activePatrolRoute.returnPolylinePoints)"
+                            fill="none" stroke="#4f46e5" stroke-width="2.0" stroke-dasharray="4.5 3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+                </template>
+
+                <!-- 巡回ルート本線 (白縁＋ローズレッド実線) -->
+                <polyline :points="formatSvgPoints(activePatrolRoute.polylinePoints)"
+                          fill="none" stroke="#ffffff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />
+                <polyline :points="formatSvgPoints(activePatrolRoute.polylinePoints)"
+                          fill="none" stroke="#e11d48" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95" />
+
+                <!-- 進行方向シェブロン矢印 -->
+                <g v-for="(arr, aIdx) in activePatrolRoute.directionArrows"
+                   :key="'pc_rt_arr_'+aIdx"
+                   :transform="`translate(${arr.x}, ${arr.y}) rotate(${arr.angle})`">
+                  <path d="M -3.2 -2.6 L 2.4 0 L -3.2 2.6" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M -3.2 -2.6 L 2.4 0 L -3.2 2.6" fill="none" stroke="#be123c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+
+                <!-- 通路上のアクセスポイント小ドット -->
+                <circle v-for="stop in activePatrolRoute.orderedStops"
+                        :key="'pc_rt_ac_'+stop.circle_id"
+                        :cx="stop.ax" :cy="stop.ay" r="2.1"
+                        fill="#e11d48" stroke="#ffffff" stroke-width="0.9" />
+
+                <!-- 固定起点 (★入口: 190, 140) マーカー -->
+                <g :transform="`translate(${activePatrolRoute.entrancePoint.x}, ${activePatrolRoute.entrancePoint.y})`">
+                  <circle cx="0" cy="0" r="6.5" fill="#059669" stroke="#ffffff" stroke-width="1.8" />
+                  <text x="0" y="2.8" text-anchor="middle" fill="#ffffff" font-size="8" font-weight="900">★</text>
+                  <rect x="-16" y="-18" width="32" height="10" rx="3" fill="#064e3b" stroke="#ffffff" stroke-width="0.8" opacity="0.95" />
+                  <text x="0" y="-10.8" text-anchor="middle" fill="#ffffff" font-size="6.5" font-weight="800">入口起点</text>
+                </g>
+              </svg>
+
+              <!-- ★ 買い物リストサークルの極小カラードット (4原色・pointer-events-none・近傍スナップ選択対応) -->
+              <div v-for="item in activeListMapPins" :key="'pc_mp_'+item.circle_id"
+                   class="list-map-dot pointer-events-none select-none"
+                   :style="getListPinStyle(item)">
+                <!-- 優先度S未完了ピン: 呼吸するように広がる赤いパルス波紋 (inset-0でブース枠内に収まるスマート発光) -->
+                <span v-if="item.priority === 'S' && !item.isCompleted"
+                      class="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-75 pointer-events-none"></span>
+              </div>
+
+              <!-- ★ 巡回ルート 訪問順番号バッジ (1, 2, 3...) -->
+              <template v-if="showRouteOverlay && !isMapImageError">
+                <button v-for="stop in activePatrolRoute.orderedStops"
+                        :key="'pc_rt_bdg_'+stop.circle_id"
+                        type="button"
+                        @click.stop="focusMapPinItem(stop, false)"
+                        class="route-order-badge select-none cursor-pointer"
+                        :style="getRouteBadgeStyle(stop)"
+                        :title="`巡回 #${stop.visitOrder}: ${stop.spaceLabel} ${stop.circle.circle_name}`">
+                  {{ stop.visitOrder }}
+                </button>
+              </template>
+
+              <!-- ターゲットピン (案B: targetSpace選択時のみ表示) -->
+              <div v-if="targetSpace"
+                   class="draggable-pin select-none flex items-center justify-center"
+                   :style="{ left: (pinX * mapScale) + 'px', top: (pinY * mapScale) + 'px' }"
+                   @mousedown.stop="startDrag"
+                   @touchstart.stop="startDrag">
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5 bg-gray-900/95 text-white text-[10px] font-bold rounded-md whitespace-nowrap shadow-md border border-white/20 pointer-events-none">
+                  {{ targetSpace }}
+                </div>
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 rounded-full bg-rose-500/40 ring-2 ring-rose-600 animate-ping pointer-events-none"></span>
+                <span class="text-2xl leading-none relative z-10">📍</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ★ 買物中モード専用: 未購入サークルクイックピルバー (PC) -->
+          <div v-if="isShoppingMapMode && unboughtListMapPins.length > 0 && !focusedMapCircle"
+               class="absolute bottom-2 inset-x-2 z-20 bg-slate-950/90 backdrop-blur-md text-white rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-1.5 overflow-x-auto border border-pink-500/40 custom-scrollbar">
+            <span class="text-[10px] font-extrabold text-pink-400 shrink-0 flex items-center gap-1">
+              <span class="animate-pulse">🎯</span>{{ showRouteOverlay ? '巡回順:' : '未購入:' }}
+            </span>
+            <button v-for="pin in unboughtListMapPins" :key="'pc_shop_nav_'+pin.circle_id"
+                    @click="focusMapCircleById(pin.circle_id)"
+                    class="shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition cursor-pointer bg-white/10 hover:bg-pink-600 hover:text-white border border-white/10">
+              <span v-if="patrolOrderMap[pin.circle_id]" class="px-1 bg-rose-600 text-white rounded text-[9px] font-mono">#{{ patrolOrderMap[pin.circle_id] }}</span>
+              <span class="text-pink-300 font-mono">{{ pin.circle.space_sym }}-{{ pin.circle.space_num }}</span>
+              <span class="max-w-[80px] truncate text-[10px] opacity-80">{{ pin.circle.circle_name }}</span>
+            </button>
+          </div>
+
+          <!-- ★ マップ選択中サークルのクイックアクションバー (PC: マップ下部オーバーレイ固定でガタつき防止) -->
+          <div v-if="focusedMapCircle" class="absolute bottom-2 inset-x-2 z-20 bg-slate-900/95 backdrop-blur-xs text-white rounded-xl px-3 py-2 shadow-lg flex items-center justify-between gap-2 border border-slate-700">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <!-- 前後サークル順送りボタン (リスト複数登録時) -->
+              <div v-if="spaceOrderedListPins.length > 1" class="flex items-center gap-0.5 shrink-0">
+                <button @click="stepMapPin(-1)" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold cursor-pointer" title="前の配置のリストサークルへ">◀</button>
+                <button @click="stepMapPin(1)" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold cursor-pointer" title="次の配置のリストサークルへ">▶</button>
+              </div>
+              <span class="px-1.5 py-0.5 rounded text-[11px] font-extrabold shrink-0" :class="getFocusedPinBadgeClass(focusedMapCircle.circle_id)">
+                {{ focusedMapCircle.space_sym }}-{{ focusedMapCircle.space_num }}
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-extrabold truncate">{{ focusedMapCircle.circle_name }}</div>
+                <div v-if="savedList[focusedMapCircle.circle_id]" class="text-[10px] text-slate-300 truncate flex items-center gap-1.5">
+                  <span v-if="savedList[focusedMapCircle.circle_id].priority">優先:{{ savedList[focusedMapCircle.circle_id].priority }}</span>
+                  <span v-if="savedList[focusedMapCircle.circle_id].price">¥{{ Number(savedList[focusedMapCircle.circle_id].price).toLocaleString() }}</span>
+                  <span v-if="savedList[focusedMapCircle.circle_id].memo" class="text-amber-300 truncate">📝{{ savedList[focusedMapCircle.circle_id].memo }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button @click="openDetails(focusedMapCircle)"
+                      class="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center gap-1 shadow-xs">
+                <span>📸</span>
+                <span>詳細</span>
+              </button>
+              <button v-if="!isReadOnly && savedList[focusedMapCircle.circle_id]"
+                      @click="toggleBought(focusedMapCircle.circle_id)"
+                      class="px-2.5 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center gap-1 border"
+                      :class="savedList[focusedMapCircle.circle_id].bought ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-600'">
+                <span>{{ savedList[focusedMapCircle.circle_id].bought ? '✓ 済' : '🛒 済にする' }}</span>
+              </button>
+              <button @click="clearMapFocus" class="w-6 h-6 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm cursor-pointer" title="閉じる">×</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PC用 配置ブロック絞り込み ＆ 会場速報 (折りたたみ対応でノートPCでもマップ領域を広く確保可能) -->
+        <div class="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200/80 shrink-0 space-y-2">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <button @click="showPcBlockPanel = !showPcBlockPanel"
+                      class="text-[11px] font-extrabold text-gray-700 hover:text-gray-900 flex items-center gap-1 cursor-pointer select-none">
+                <span>🧭</span>
+                <span>配置ブロック ＆ 会場X速報</span>
+                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" :class="showPcBlockPanel ? '' : 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <button v-if="filterBlock" @click="selectBlockAndFocusMap(filterBlock)" class="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer">
+                解除 ({{ filterBlock }})
+              </button>
+            </div>
+
+            <!-- 折りたたみ中も会場速報リンクへ即アクセス可能 -->
+            <div v-if="!showPcBlockPanel" class="flex items-center gap-1">
+              <a :href="getEventLiveSearchUrl('soldout')" target="_blank" class="px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded text-[10px] font-bold">💔完売</a>
+              <a :href="getEventLiveSearchUrl('line')" target="_blank" class="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded text-[10px] font-bold">🚶列</a>
+              <a :href="getEventLiveSearchUrl('all')" target="_blank" class="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded text-[10px] font-bold">📢速報</a>
+            </div>
+          </div>
+
+          <div v-show="showPcBlockPanel" class="space-y-2">
+            <div class="flex flex-wrap gap-1">
+              <button v-for="block in blocks" :key="'pc_b_'+block" @click="selectBlockAndFocusMap(block)"
+                      class="min-w-[32px] h-7 px-2 rounded-lg text-xs font-extrabold transition-all active:scale-95 cursor-pointer"
+                      :class="filterBlock === block ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300' : 'bg-white text-gray-700 border border-gray-200 hover:bg-blue-50 hover:border-blue-200'">
+                {{ block }}
+              </button>
+            </div>
+
+            <div class="pt-1.5 border-t border-gray-200/70 flex items-center justify-between gap-2">
+              <span class="text-[11px] font-extrabold text-slate-700 flex items-center gap-1 shrink-0">
+                <span class="text-amber-500">⚡</span>会場X速報:
+              </span>
+              <div class="grid grid-cols-3 gap-1.5 flex-1">
+                <a :href="getEventLiveSearchUrl('soldout')" target="_blank" 
+                   class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
+                  <span>💔 完売</span>
+                </a>
+                <a :href="getEventLiveSearchUrl('line')" target="_blank" 
+                   class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
+                  <span>🚶 列情報</span>
+                </a>
+                <a :href="getEventLiveSearchUrl('all')" target="_blank" 
+                   class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
+                  <span>📢 #VGGC12th</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================
+           右側：メインコンテンツ (スマホでは全画面)
+      ========================================== -->
+      <div class="flex-1 flex flex-col h-full overflow-hidden bg-gray-50 relative min-w-0">
+        
+        <!-- PC専用タブヘッダー (レジモード時は非表示にして全画面化) -->
+        <div v-show="activeTab !== 'register'" class="hidden md:flex border-b bg-white shadow-xs z-10 flex-shrink-0">
+          <button @click="activeTab = 'search'" :class="activeTab === 'search' ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
+            <span>🔍 サークルを探す</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" :class="activeTab === 'search' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'">{{ filteredCircles.length }}</span>
+          </button>
+          <button @click="activeTab = 'list'" :class="activeTab === 'list' ? 'border-pink-500 text-pink-600 bg-pink-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-2 cursor-pointer">
+            <span>📝 買い物リスト</span>
+            <span class="bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full text-xs shadow-xs">{{ savedCount }}</span>
+          </button>
+          <button @click="activeTab = 'memo'" :class="activeTab === 'memo' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
+            <span>⏰ 準備・予定</span>
+            <span v-if="timelineEvents.length > 0" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-mono font-bold shadow-xs">{{ timelineEvents.length }}</span>
+          </button>
+          <button v-if="isCircleModeEnabled" @click="activeTab = 'register'" :class="activeTab === 'register' ? 'border-amber-500 text-amber-800 bg-amber-50/70' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
+            <span>🏪 レジ (M-15-16)</span>
+            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">Black Stance</span>
+          </button>
+        </div>
+
+        <!-- スクロール可能なコンテンツエリア (スクロール連動自動スリムヘッダー検知) -->
+        <div v-show="activeTab !== 'register'" ref="mainScrollContainer" @scroll.passive="handleListScroll" class="flex-1 overflow-y-auto w-full relative min-h-0">
+          
+          <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-gray-50/80 z-20 backdrop-blur-sm">
+            <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+
+          <!-- =========================================
+               [スマホ専用] マップ タブ
+          ========================================== -->
+          <div v-show="activeTab === 'map'" class="md:hidden p-2.5 space-y-2 pb-28">
+            <div class="space-y-2">
+              <!-- 1段目: タイトル & 選択中スペース & PDFリンク -->
+              <div class="flex justify-between items-center gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <h1 class="text-base font-extrabold text-gray-800 px-0.5 shrink-0 flex items-center gap-1">
+                    <span>🗺️</span>
+                    <span>会場マップ</span>
+                  </h1>
+                  <span v-if="targetSpace && !focusedMapCircle" class="text-[11px] font-bold bg-pink-100 text-pink-800 border border-pink-200 px-2 py-0.5 rounded-full flex items-center gap-1 truncate">
+                    <span class="truncate">📍 {{ targetSpace }}</span>
+                    <button @click="clearMapFocus" class="ml-0.5 font-bold hover:text-pink-950">×</button>
+                  </span>
+                </div>
+                <!-- 公式会場マップPDFリンク -->
+                <a href="/map.pdf" target="_blank" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 active:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-lg flex items-center gap-1 shrink-0 shadow-2xs" title="公式会場マップPDFを開く">
+                  <span>📄 PDF ↗</span>
+                </a>
+              </div>
+
+              <!-- 2段目: ルートトグル & 買物中トグル & リストピントグル (3カラム均等配置で誤タップ防止 & 被り解消) -->
+              <div class="grid grid-cols-3 gap-1.5">
+                <!-- スマホ用 巡回ルート ON/OFF トグル -->
+                <button @click="toggleRouteOverlay"
+                        class="text-[11px] font-extrabold py-1.5 px-1.5 rounded-lg border transition flex items-center justify-center gap-1 shrink-0 shadow-2xs active:scale-98"
+                        :class="showRouteOverlay ? 'bg-rose-600 text-white border-rose-700 ring-2 ring-rose-200' : 'bg-rose-50 text-rose-700 border-rose-200'">
+                  <span>🧭 ルート: {{ showRouteOverlay ? 'ON' : 'OFF' }}</span>
+                  <span v-if="showRouteOverlay && activePatrolRoute.orderedStops.length > 0" class="px-1 bg-white/20 rounded text-[9px] font-mono">{{ activePatrolRoute.orderedStops.length }}</span>
+                </button>
+                <!-- スマホ用 買物中マップモード ON/OFF トグル -->
+                <button @click="toggleShoppingMapMode"
+                        class="text-[11px] font-extrabold py-1.5 px-1.5 rounded-lg border transition flex items-center justify-center gap-1 shrink-0 shadow-2xs active:scale-98"
+                        :class="isShoppingMapMode ? 'bg-pink-600 text-white border-pink-700 ring-2 ring-pink-300 animate-pulse' : 'bg-pink-50 text-pink-700 border-pink-200'">
+                  <span>📍 買物中: {{ isShoppingMapMode ? 'ON' : 'OFF' }}</span>
+                </button>
+                <!-- スマホ用 リストピン ON/OFF トグル -->
+                <button @click="showListPins = !showListPins"
+                        class="text-[11px] font-extrabold py-1.5 px-1.5 rounded-lg border transition flex items-center justify-center gap-1 shrink-0 shadow-2xs active:scale-98"
+                        :class="showListPins ? 'bg-slate-800 text-white border-slate-900' : 'bg-gray-100 text-gray-700 border-gray-300'">
+                  <span>🛒 リスト: {{ showListPins ? 'ON' : 'OFF' }}</span>
+                  <span v-if="showListPins" class="px-1 bg-white/20 rounded text-[9px] font-mono">{{ activeListMapPins.length }}</span>
+                </button>
+              </div>
+
+              <!-- スマホ用 4原色カラー凡例バー -->
+              <div v-if="showListPins" class="flex items-center justify-between px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-bold text-slate-700 shadow-2xs gap-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block ring-1 ring-red-900"></span>S:最優先</span>
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block ring-1 ring-yellow-800"></span>A:買いたい</span>
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block ring-1 ring-blue-900"></span>B:見に行く</span>
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block ring-1 ring-emerald-900"></span>未</span>
+                </div>
+                <button @click="showCompletedPins = !showCompletedPins"
+                        class="text-[10px] px-1.5 py-0.5 rounded border transition shrink-0"
+                        :class="showCompletedPins ? 'bg-slate-200 text-slate-800 border-slate-300 font-bold' : 'bg-gray-50 text-slate-500 border-gray-200'">
+                  {{ showCompletedPins ? '✓済表示中' : '済は消去' }}
+                </button>
+              </div>
+
+              <!-- ★ スマホ用 巡回ルート設定＆計画ルート注記バー (ルート表示ON時) -->
+              <div v-if="showRouteOverlay" class="px-2.5 py-1.5 bg-rose-50/90 border border-rose-200 rounded-lg text-[11px] text-slate-700 shadow-2xs space-y-1">
+                <div class="flex items-center justify-between gap-1.5 flex-wrap">
+                  <div class="inline-flex rounded-md bg-white p-0.5 border border-rose-200 shadow-2xs">
+                    <button type="button" @click="routeOrderMode = 'priority'"
+                            class="px-2 py-0.5 rounded text-[10px] font-extrabold transition"
+                            :class="routeOrderMode === 'priority' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600'">
+                      優先度順
+                    </button>
+                    <button type="button" @click="routeOrderMode = 'shortest'"
+                            class="px-2 py-0.5 rounded text-[10px] font-extrabold transition"
+                            :class="routeOrderMode === 'shortest' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600'">
+                      最短順
+                    </button>
+                  </div>
+
+                  <div class="flex items-center gap-1">
+                    <select v-model="routeTargetFilter" class="h-6 text-[10px] font-extrabold bg-white border border-rose-200 rounded px-1 text-slate-800 outline-none">
+                      <option value="all">未購入すべて</option>
+                      <option value="S">S(最優先)のみ</option>
+                      <option value="SA">S + A のみ</option>
+                      <option value="include_done">購入済も含む</option>
+                    </select>
+                    <label class="h-6 px-1.5 bg-white border border-rose-200 rounded flex items-center gap-1 text-[10px] font-extrabold text-slate-700 select-none">
+                      <input type="checkbox" v-model="routeReturnToEntrance" class="accent-rose-600 w-3 h-3">
+                      <span>入口帰還</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between gap-1 text-[10px] text-slate-500">
+                  <span v-if="activePatrolRoute.orderedStops.length > 0" class="font-bold text-rose-800">
+                    ★入口→{{ activePatrolRoute.orderedStops.length }}件 (距離:{{ Math.round(activePatrolRoute.totalDistance) }})
+                  </span>
+                  <span v-else>※未購入サークル追加で描画</span>
+                  <span class="truncate">※計画用ルート(現地誘導優先)</span>
+                </div>
+              </div>
+
+              <!-- スマホ用マップビューポートラッパー (ズームボタンとアクションバーを固定しガタつきゼロ化) -->
+              <div class="relative h-[58vh] min-h-[290px] max-h-[540px] flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <!-- 固定ズームコントロール (スクロールしても流れない・アクションバーまたはピルバー表示時は上に自動退避) -->
+                <div class="absolute right-3 flex flex-col gap-1.5 z-20 transition-all duration-200"
+                     :class="(focusedMapCircle || (isShoppingMapMode && unboughtListMapPins.length > 0)) ? 'bottom-16' : 'bottom-3'">
+                  <button @click="changeMapScale(0.25)" class="w-10 h-10 bg-white/95 shadow-lg rounded-xl flex items-center justify-center text-gray-800 font-bold border border-gray-200 active:bg-gray-100 transition" title="拡大">＋</button>
+                  <button @click="mapScale = 1.0" class="w-10 h-7 bg-white/95 shadow-lg rounded-xl flex items-center justify-center text-[10px] text-gray-600 font-bold border border-gray-200 active:bg-gray-100 transition" title="リセット">{{ Math.round(mapScale * 100) }}%</button>
+                  <button @click="changeMapScale(-0.25)" class="w-10 h-10 bg-white/95 shadow-lg rounded-xl flex items-center justify-center text-gray-800 font-bold border border-gray-200 active:bg-gray-100 transition" title="縮小">－</button>
+                </div>
+
+                <!-- スクロール領域本体 -->
+                <div class="map-container flex-1 w-full h-full">
+                  <div class="map-inner"
+                       @mousedown="handleMapPointerDown"
+                       @touchstart.passive="handleMapPointerDown"
+                       @click="handleMapClick"
+                       @touchmove="dragPin" @mousemove="dragPin" @mouseup="stopDrag" @mouseleave="stopDrag" @touchend="stopDrag">
+                    <img v-if="!isMapImageError"
+                    src="/map.jpg"
+                    alt="会場マップ"
+                    class="map-image"
+                    loading="lazy"
+                    :style="{ width: (900 * mapScale) + 'px' }"
+                    @error="isMapImageError = true">
+               <!-- マップ画像ロード失敗時のフォールバック案内 (PC) -->
+               <div v-else class="flex flex-col items-center justify-center p-8 text-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl m-6 space-y-3">
+                 <div class="text-3xl">🗺️</div>
+                 <p class="text-sm font-bold text-gray-700">会場マップ画像の取得に失敗しました</p>
+                 <p class="text-xs text-gray-500">オフラインキャッシュが未完了の場合は公式PDFマップもご利用いただけます。</p>
+                 <div class="flex items-center gap-2">
+                   <button @click="retryMapImage" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow hover:bg-blue-700">再試行</button>
+                   <a href="/map.pdf" target="_blank" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-300">📄 PDFマップを開く</a>
+                 </div>
+               </div>
+
+                    <!-- ★ 巡回ルート SVG オーバーレイ (スマホ: 座標系900×400.78125完全一致・通路ホワイトリスト描画) -->
+                    <svg v-if="showRouteOverlay && activePatrolRoute.orderedStops.length > 0 && !isMapImageError"
+                         class="map-route-svg pointer-events-none select-none"
+                         viewBox="0 0 900 400.78125"
+                         preserveAspectRatio="none">
+                      <line v-for="stop in activePatrolRoute.orderedStops"
+                            :key="'mb_rt_tick_'+stop.circle_id"
+                            :x1="stop.ax" :y1="stop.ay"
+                            :x2="stop.fx" :y2="stop.fy"
+                            stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" opacity="0.9" />
+                      <line v-for="stop in activePatrolRoute.orderedStops"
+                            :key="'mb_rt_tick_fg_'+stop.circle_id"
+                            :x1="stop.ax" :y1="stop.ay"
+                            :x2="stop.fx" :y2="stop.fy"
+                            stroke="#e11d48" stroke-width="1.6" stroke-dasharray="2 1.5" stroke-linecap="round" opacity="0.9" />
+
+                      <template v-if="routeReturnToEntrance && activePatrolRoute.returnPolylinePoints.length > 1">
+                        <polyline :points="formatSvgPoints(activePatrolRoute.returnPolylinePoints)"
+                                  fill="none" stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.88" />
+                        <polyline :points="formatSvgPoints(activePatrolRoute.returnPolylinePoints)"
+                                  fill="none" stroke="#4f46e5" stroke-width="2.0" stroke-dasharray="4.5 3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+                      </template>
+
+                      <polyline :points="formatSvgPoints(activePatrolRoute.polylinePoints)"
+                                fill="none" stroke="#ffffff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />
+                      <polyline :points="formatSvgPoints(activePatrolRoute.polylinePoints)"
+                                fill="none" stroke="#e11d48" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95" />
+
+                      <g v-for="(arr, aIdx) in activePatrolRoute.directionArrows"
+                         :key="'mb_rt_arr_'+aIdx"
+                         :transform="`translate(${arr.x}, ${arr.y}) rotate(${arr.angle})`">
+                        <path d="M -3.2 -2.6 L 2.4 0 L -3.2 2.6" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M -3.2 -2.6 L 2.4 0 L -3.2 2.6" fill="none" stroke="#be123c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                      </g>
+
+                      <circle v-for="stop in activePatrolRoute.orderedStops"
+                              :key="'mb_rt_ac_'+stop.circle_id"
+                              :cx="stop.ax" :cy="stop.ay" r="2.1"
+                              fill="#e11d48" stroke="#ffffff" stroke-width="0.9" />
+
+                      <g :transform="`translate(${activePatrolRoute.entrancePoint.x}, ${activePatrolRoute.entrancePoint.y})`">
+                        <circle cx="0" cy="0" r="6.5" fill="#059669" stroke="#ffffff" stroke-width="1.8" />
+                        <text x="0" y="2.8" text-anchor="middle" fill="#ffffff" font-size="8" font-weight="900">★</text>
+                        <rect x="-16" y="-18" width="32" height="10" rx="3" fill="#064e3b" stroke="#ffffff" stroke-width="0.8" opacity="0.95" />
+                        <text x="0" y="-10.8" text-anchor="middle" fill="#ffffff" font-size="6.5" font-weight="800">入口起点</text>
+                      </g>
+                    </svg>
+
+                    <!-- ★ 買い物リストサークルの極小カラードット (4原色・pointer-events-none・近傍スナップ選択対応) -->
+                    <div v-for="item in activeListMapPins" :key="'mb_mp_'+item.circle_id"
+                         class="list-map-dot pointer-events-none select-none"
+                         :style="getListPinStyle(item)">
+                      <!-- 優先度S未完了ピン: 呼吸するように広がる赤いパルス波紋 (inset-0でブース枠内に収まるスマート発光) -->
+                      <span v-if="item.priority === 'S' && !item.isCompleted"
+                            class="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-75 pointer-events-none"></span>
+                    </div>
+
+                    <!-- ★ 巡回ルート 訪問順番号バッジ (スマホ: 1, 2, 3...) -->
+                    <template v-if="showRouteOverlay && !isMapImageError">
+                      <button v-for="stop in activePatrolRoute.orderedStops"
+                              :key="'mb_rt_bdg_'+stop.circle_id"
+                              type="button"
+                              @click.stop="focusMapPinItem(stop, false)"
+                              class="route-order-badge select-none"
+                              :style="getRouteBadgeStyle(stop)">
+                        {{ stop.visitOrder }}
+                      </button>
+                    </template>
+
+                    <!-- ターゲットピン (案B: targetSpace選択時のみ表示) -->
+                    <div v-if="targetSpace"
+                         class="draggable-pin select-none flex items-center justify-center"
+                         :style="{ left: (pinX * mapScale) + 'px', top: (pinY * mapScale) + 'px' }"
+                         @mousedown.stop="startDrag"
+                         @touchstart.stop="startDrag">
+                      <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5 bg-gray-900/95 text-white text-[10px] font-bold rounded-md whitespace-nowrap shadow-md border border-white/20 pointer-events-none">
+                        {{ targetSpace }}
+                      </div>
+                      <span class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 rounded-full bg-rose-500/40 ring-2 ring-rose-600 animate-ping pointer-events-none"></span>
+                      <span class="text-2xl leading-none relative z-10">📍</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ★ 買物中モード専用: 未購入サークルクイックピルバー (スマホ) -->
+                <div v-if="isShoppingMapMode && unboughtListMapPins.length > 0 && !focusedMapCircle"
+                     class="absolute bottom-2 inset-x-2 z-20 bg-slate-950/90 backdrop-blur-md text-white rounded-xl px-2 py-1.5 shadow-xl flex items-center gap-1.5 overflow-x-auto border border-pink-500/40 custom-scrollbar">
+                  <span class="text-[10px] font-extrabold text-pink-400 shrink-0 flex items-center gap-1">
+                    <span class="animate-pulse">🎯</span>{{ showRouteOverlay ? '巡回順:' : '未購入:' }}
+                  </span>
+                  <button v-for="pin in unboughtListMapPins" :key="'mb_shop_nav_'+pin.circle_id"
+                          @click="focusMapCircleById(pin.circle_id)"
+                          class="shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition cursor-pointer bg-white/10 active:bg-pink-600 active:text-white border border-white/10">
+                    <span v-if="patrolOrderMap[pin.circle_id]" class="px-1 bg-rose-600 text-white rounded text-[9px] font-mono">#{{ patrolOrderMap[pin.circle_id] }}</span>
+                    <span class="text-pink-300 font-mono">{{ pin.circle.space_sym }}-{{ pin.circle.space_num }}</span>
+                    <span class="max-w-[70px] truncate text-[10px] opacity-80">{{ pin.circle.circle_name }}</span>
+                  </button>
+                </div>
+
+                <!-- ★ マップ選択中サークルのクイックアクションバー (スマホ: マップ下部オーバーレイ固定でガタつき防止) -->
+                <div v-if="focusedMapCircle" class="absolute bottom-2 inset-x-2 z-20 bg-slate-900/95 backdrop-blur-xs text-white rounded-xl p-2 shadow-lg flex items-center justify-between gap-1.5 border border-slate-700">
+                  <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                    <div v-if="spaceOrderedListPins.length > 1" class="flex items-center gap-0.5 shrink-0">
+                      <button @click="stepMapPin(-1)" class="w-7 h-7 rounded-lg bg-slate-800 active:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">◀</button>
+                      <button @click="stepMapPin(1)" class="w-7 h-7 rounded-lg bg-slate-800 active:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">▶</button>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded text-xs font-extrabold shrink-0" :class="getFocusedPinBadgeClass(focusedMapCircle.circle_id)">
+                      {{ focusedMapCircle.space_sym }}-{{ focusedMapCircle.space_num }}
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-extrabold truncate">{{ focusedMapCircle.circle_name }}</div>
+                      <div v-if="savedList[focusedMapCircle.circle_id]" class="text-[10px] text-slate-300 truncate flex items-center gap-1.5">
+                        <span v-if="savedList[focusedMapCircle.circle_id].priority">優先:{{ savedList[focusedMapCircle.circle_id].priority }}</span>
+                        <span v-if="savedList[focusedMapCircle.circle_id].price">¥{{ Number(savedList[focusedMapCircle.circle_id].price).toLocaleString() }}</span>
+                        <span v-if="savedList[focusedMapCircle.circle_id].memo" class="text-amber-300 truncate">📝{{ savedList[focusedMapCircle.circle_id].memo }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button @click="openDetails(focusedMapCircle)"
+                            class="px-2.5 py-1.5 bg-amber-400 active:bg-amber-300 text-slate-950 rounded-lg text-xs font-extrabold flex items-center gap-1">
+                      <span>📸</span>
+                      <span>詳細</span>
+                    </button>
+                    <button v-if="!isReadOnly && savedList[focusedMapCircle.circle_id]"
+                            @click="toggleBought(focusedMapCircle.circle_id)"
+                            class="px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1 border"
+                            :class="savedList[focusedMapCircle.circle_id].bought ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-slate-800 active:bg-slate-700 text-white border-slate-600'">
+                      <span>{{ savedList[focusedMapCircle.circle_id].bought ? '✓済' : '🛒済' }}</span>
+                    </button>
+                    <button @click="clearMapFocus" class="w-6 h-6 rounded-full text-slate-400 flex items-center justify-center text-sm">×</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-3.5 shadow-xs border border-gray-200/80">
+              <div class="flex justify-between items-center mb-2.5">
+                <h2 class="text-xs font-extrabold text-gray-700">🧭 配置ブロックで位置確認＆絞り込み</h2>
+                <button v-if="filterBlock" @click="activeTab = 'search'" class="text-[11px] font-bold text-blue-600 hover:underline">
+                  🔍 {{ filterBlock }}のサークル一覧を見る →
+                </button>
+                <span v-else class="text-[10px] text-gray-400">タップでマップ位置表示</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button v-for="block in blocks" :key="block" @click="selectBlockAndFocusMap(block)"
+                        class="min-w-[44px] min-h-[42px] px-3 py-1.5 rounded-xl text-sm font-extrabold transition-all active:scale-95"
+                        :class="filterBlock === block ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300' : 'bg-gray-50 text-gray-700 border border-gray-200'">
+                  {{ block }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- =========================================
+               探す (検索) タブ
+          ========================================== -->
+          <div v-show="activeTab === 'search'" class="flex flex-col min-h-full pb-28 md:pb-8">
+            <div class="p-2.5 md:p-3.5 bg-gray-50/95 backdrop-blur-md sticky top-0 z-20 border-b border-gray-200 shadow-xs">
+              <!-- 検索入力ボックス -->
+              <div class="relative shadow-xs rounded-xl overflow-hidden bg-white border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input ref="searchInputRef" type="text" v-model="searchQuery" placeholder="サークル名、ペンネーム、商品名、配置(A-01)で検索..." 
+                       class="w-full pl-9 pr-14 py-2 text-base md:text-sm text-gray-900 placeholder-gray-400 focus:outline-none">
+                
+                <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                  <kbd v-if="!searchQuery" class="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-100 border border-gray-200 rounded">/</kbd>
+                  <button v-if="searchQuery" @click="searchQuery = ''" class="p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer" title="クリア">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 検索結果件数 ＆ クイック絞り込みバー -->
+              <div class="mt-2 flex items-center justify-between gap-1.5 px-0.5 flex-wrap">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-xs font-extrabold text-gray-700">
+                    全 <span class="text-blue-600 font-mono text-sm">{{ filteredCircles.length }}</span> 件
+                  </span>
+
+                  <!-- 選択中のフィルターチップ（パネルを閉じていても一目で分かりワンタップ解除可能） -->
+                  <button v-if="filterBlock" @click="selectBlockAndFocusMap(filterBlock, false)"
+                          class="text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-blue-200 transition cursor-pointer">
+                    <span>📍 {{ filterBlock }}</span>
+                    <span>×</span>
+                  </button>
+                  <button v-for="m in selectedMembers" :key="'chip_'+m" @click="toggleMemberFilter(m)"
+                          class="text-[11px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition cursor-pointer shadow-2xs"
+                          :style="getMemberStyle(m)">
+                    <span>{{ getMemberMark(m) }}{{ m }}</span>
+                    <span>×</span>
+                  </button>
+                  <button v-if="filterItemTag" @click="filterItemTag = ''"
+                          class="text-[11px] font-bold bg-gray-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-gray-700 transition cursor-pointer">
+                    <span>#{{ filterItemTag }}</span>
+                    <span>×</span>
+                  </button>
+                  <button v-if="filterRecentOnly" @click="filterRecentOnly = false"
+                          class="text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-rose-200 transition cursor-pointer">
+                    <span>🆕 48h新着のみ</span>
+                    <span>×</span>
+                  </button>
+                  <button v-if="hideAbsent" @click="hideAbsent = false"
+                          class="text-[11px] font-bold bg-slate-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-slate-700 transition cursor-pointer shadow-2xs">
+                    <span>🚫 欠席非表示</span>
+                    <span>×</span>
+                  </button>
+
+                  <button v-if="searchQuery || filterBlock || selectedMembers.length > 0 || filterItemTag || filterHasOshinagaki || filterRecentOnly || hideAbsent || searchSortOrder !== 'space'"
+                          @click="resetAllFilters"
+                          class="text-[11px] font-bold text-rose-600 hover:underline px-1 py-0.5 cursor-pointer">
+                    クリア
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-1.5 ml-auto flex-wrap">
+                  <!-- ★ 新着お品書き順ソート切替ボタン -->
+                  <button @click="searchSortOrder = searchSortOrder === 'recent' ? 'space' : 'recent'"
+                          type="button"
+                          class="px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 shadow-xs shrink-0 cursor-pointer select-none"
+                          :class="searchSortOrder === 'recent'
+                            ? 'bg-gradient-to-r from-rose-500 to-orange-500 border-rose-500 text-white ring-1 ring-rose-300'
+                            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'"
+                          title="直近でお品書きや頒布物が登録・更新されたサークルを新しい順に表示します">
+                    <span>{{ searchSortOrder === 'recent' ? '🆕 新着順:ON' : '🆕 新着順' }}</span>
+                    <span v-if="recentOshinagakiCount > 0"
+                          class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold"
+                          :class="searchSortOrder === 'recent' ? 'bg-white text-rose-600' : 'bg-rose-100 text-rose-700'">
+                      {{ recentOshinagakiCount }}
+                    </span>
+                  </button>
+
+                  <!-- お品書き公開済みのみ 絞り込みトグル -->
+                  <label class="flex items-center gap-1 cursor-pointer text-xs font-bold transition select-none px-2.5 py-1 rounded-xl border shadow-xs shrink-0"
+                         :class="filterHasOshinagaki ? 'bg-amber-100 border-amber-400 text-amber-950 ring-1 ring-amber-300' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                    <input type="checkbox" v-model="filterHasOshinagaki" class="accent-amber-600 w-3.5 h-3.5">
+                    <span>📸 お品書き有</span>
+                  </label>
+
+                  <!-- フィルター開閉トグル -->
+                  <button @click="showSearchFilters = !showSearchFilters"
+                          class="px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 shadow-xs cursor-pointer"
+                          :class="(showSearchFilters || filterBlock || selectedMembers.length > 0 || filterItemTag || filterRecentOnly || hideAbsent) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                    <span>🌪️ 絞り込み</span>
+                    <span v-if="selectedMembers.length > 0 || hideAbsent" class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono font-bold">
+                      {{ selectedMembers.length + (hideAbsent ? 1 : 0) }}
+                    </span>
+                    <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="showSearchFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- ★ 絞り込みフィルター群 (ブロック / メンバー / タグ / 新着 / 欠席 クロス検索対応) -->
+              <div v-show="showSearchFilters" class="mt-2 pt-2 border-t border-gray-200/80 space-y-1.5 px-0.5">
+                <!-- 更新状況＆欠席クイック絞り込み -->
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">状況</span>
+                  <div class="flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar flex-1 items-center">
+                    <!-- 直近48時間更新 -->
+                    <button @click="filterRecentOnly = !filterRecentOnly"
+                            type="button"
+                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition flex items-center gap-1 cursor-pointer shrink-0"
+                            :class="filterRecentOnly ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-rose-500 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                      <span>🆕 直近48時間更新 ({{ recentOshinagakiCount }}件)</span>
+                    </button>
+
+                    <!-- 当日欠席サークル除外 -->
+                    <button @click="hideAbsent = !hideAbsent"
+                            type="button"
+                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition flex items-center gap-1 cursor-pointer shrink-0"
+                            :class="hideAbsent ? 'bg-slate-800 text-white border-slate-900 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                      <span>🚫 欠席・不参加を除く{{ absentCirclesCount > 0 ? ` (${absentCirclesCount}件)` : '' }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ブロック横スクロール -->
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">配置</span>
+                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1">
+                    <button @click="filterBlock = ''; targetSpace = null" class="px-2 py-0.5 text-xs font-bold rounded-lg whitespace-nowrap transition cursor-pointer" :class="!filterBlock ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">すべて</button>
+                    <button v-for="b in blocks" :key="'sb_'+b" @click="selectBlockAndFocusMap(b, false)"
+                            class="min-w-[30px] px-2 py-0.5 text-xs font-extrabold rounded-lg whitespace-nowrap border transition cursor-pointer"
+                            :class="filterBlock === b ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                      {{ b }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- メンバー横スクロール (複数OR選択対応) -->
+                <div v-if="availableTags.members.length" class="flex items-center gap-2">
+                  <div class="flex items-center gap-1 w-16 shrink-0">
+                    <span class="text-[11px] font-bold text-gray-500">メンバー</span>
+                    <span v-if="selectedMembers.length > 0" class="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1 rounded-sm">
+                      {{ selectedMembers.length }}
+                    </span>
+                  </div>
+                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1 items-center">
+                    <button @click="selectedMembers = []" 
+                            class="px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap transition cursor-pointer" 
+                            :class="selectedMembers.length === 0 ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">
+                      すべて
+                    </button>
+                    <button v-for="m in availableTags.members" :key="'fm_'+m" 
+                            @click="toggleMemberFilter(m)" 
+                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border flex items-center gap-1 transition cursor-pointer" 
+                            :style="isMemberSelected(m) ? getMemberStyle(m) : {}" 
+                            :class="!isMemberSelected(m) ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' : 'opacity-100 ring-2 ring-offset-1 ring-blue-500 font-black shadow-xs'">
+                      <span v-if="isMemberSelected(m)" class="text-[10px] font-black">✓</span>
+                      <span>{{ getMemberMark(m) }}</span>
+                      <span>{{ m }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- タグ横スクロール -->
+                <div v-if="availableTags.tags.length" class="flex items-center gap-2">
+                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">タグ</span>
+                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1">
+                    <button @click="filterItemTag = ''" class="px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap transition cursor-pointer" :class="!filterItemTag ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">すべて</button>
+                    <button v-for="t in availableTags.tags" :key="'ft_'+t" @click="filterItemTag = filterItemTag === t ? '' : t" class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition cursor-pointer" :class="filterItemTag === t ? 'bg-blue-100 border-blue-400 text-blue-900 ring-2 ring-offset-1 ring-blue-200' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                      {{ t }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 検索結果 0件時のエンプティステート -->
+            <div v-if="filteredCircles.length === 0" class="p-10 text-center my-6">
+              <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔍</div>
+              <p class="font-bold text-gray-700 text-sm mb-1">条件に一致するサークルが見つかりませんでした</p>
+              <p class="text-xs text-gray-500 mb-4">検索ワードや絞り込み条件を変更してみてください</p>
+              <button @click="resetAllFilters" class="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl shadow hover:bg-blue-700 transition cursor-pointer">
+                すべての絞り込みを解除
+              </button>
+            </div>
+
+            <!-- 検索タブのサークル一覧 (一覧性と視認性を両立したコンパクト3段カード) -->
+            <ul v-else class="px-2.5 md:px-4 mt-2.5 grid grid-cols-1 xl:grid-cols-2 gap-2.5">
+              <li v-for="circle in filteredCircles" :key="circle.circle_id" 
+                  class="p-3 md:p-3.5 rounded-2xl shadow-xs border relative transition-all hover:shadow-md flex flex-col justify-between"
+                  :class="[
+                    isCircleAbsent(circle.circle_id) ? 'bg-rose-50/40 border-rose-200' : 
+                    savedList[circle.circle_id] ? 'bg-white border-pink-300 ring-1 ring-pink-100' : 'bg-white border-gray-200/90'
+                  ]">
+                
+                <!-- 買い物リスト追加/削除ボタン (44x44px タッチターゲット確保) -->
+                <button v-if="!isReadOnly" @click="toggleSave(circle.circle_id)" 
+                        :title="savedList[circle.circle_id] ? '買い物リストから外す' : '買い物リストに追加'"
+                        class="absolute top-3 right-3 w-11 h-11 rounded-full transition-all active:scale-90 flex items-center justify-center z-1 cursor-pointer"
+                        :class="savedList[circle.circle_id] ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 ring-2 ring-pink-200' : 'bg-gray-100 text-gray-500 hover:bg-pink-50 hover:text-pink-600 border border-gray-200'">
+                  <svg class="h-5 w-5" :fill="savedList[circle.circle_id] ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path v-if="!savedList[circle.circle_id]" stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    <path v-else stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+
+                <div class="flex flex-col gap-2 pr-12">
+                  <!-- 【第1段】配置番号・ステータスバッジ -->
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button @click="jumpToMap(circle)"
+                            title="タップして会場マップで位置を確認"
+                            class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-extrabold rounded-lg shadow-xs border transition active:scale-95 cursor-pointer"
+                            :class="isCircleAbsent(circle.circle_id) ? 'bg-rose-100 text-rose-800 border-rose-300 line-through' : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'">
+                      <span>📍</span>
+                      <span>{{ circle.space_sym }}-{{ circle.space_num }}</span>
+                    </button>
+
+                    <!-- ★ 直近48時間以内にお品書きURLまたは頒布物が更新されたサークルのNEWバッジ -->
+                    <span v-if="isRecentOshinagakiUpdate(circle.circle_id)"
+                          :title="`お品書き・頒布物情報（${getRelativeUpdateLabel(circle.circle_id)}）`"
+                          class="inline-flex items-center gap-0.5 px-2 py-0.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold rounded-md shadow-2xs">
+                      <span>🆕 新着</span>
+                    </span>
+
+                    <span v-if="isCircleAbsent(circle.circle_id)" class="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-600 text-white text-[11px] font-bold rounded-md shadow-xs">
+                      <span>🚫 当日不参加</span>
+                    </span>
+
+                    <span v-if="savedList[circle.circle_id]" class="inline-flex items-center gap-0.5 px-2 py-0.5 bg-pink-50 text-pink-700 border border-pink-200 text-[10px] font-extrabold rounded-md">
+                      <span>♥ リスト済</span>
+                    </span>
+
+                    <span v-if="circleExtraInfo[circle.circle_id]?.items?.length" class="text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <span>📦 {{ circleExtraInfo[circle.circle_id].items.length }}品</span>
+                    </span>
+
+                    <!-- 検索ワードに合致した商品名がある場合 -->
+                    <span v-if="searchQuery.trim() && getMatchedItemNames(circle.circle_id, searchQuery).length" class="text-[10px] font-bold bg-pink-100 text-pink-800 border border-pink-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <span>🎯「{{ getMatchedItemNames(circle.circle_id, searchQuery)[0] }}」</span>
+                      <span v-if="getMatchedItemNames(circle.circle_id, searchQuery).length > 1" class="text-[9px] text-pink-600">+{{ getMatchedItemNames(circle.circle_id, searchQuery).length - 1 }}</span>
+                    </span>
+                  </div>
+
+                  <!-- 【第2段】サークル名・代表者 ＆ Xリンク (1行にまとめて縦伸びを防止) -->
+                  <div>
+                    <h3 @click="openDetails(circle)" class="font-extrabold text-base md:text-lg leading-snug hover:text-blue-600 transition-colors cursor-pointer"
+                        :class="isCircleAbsent(circle.circle_id) ? 'text-gray-400 line-through decoration-rose-400' : 'text-gray-900'">
+                      {{ circle.circle_name }}
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                      <span class="text-xs text-gray-600 font-medium">代表: {{ circle.penname }}</span>
+
+                      <!-- サークル主 ＆ 売り子 Xリンク -->
+                      <a v-for="acc in getCircleAuthorAccounts(circle, circleExtraInfo[circle.circle_id])" :key="'srch_au_'+circle.circle_id+'_'+acc.handle"
+                         :href="`https://x.com/${acc.handle}`" target="_blank" @click.stop
+                         class="inline-flex items-center gap-1 text-[11px] bg-gray-900 hover:bg-gray-700 text-white px-2 py-0.5 rounded-md font-bold transition shadow-xs active:scale-95"
+                         :title="acc.name ? `サークル主: ${acc.name} (@${acc.handle})` : `サークル主: @${acc.handle}`">
+                        <svg class="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        <span class="truncate max-w-[130px]">{{ acc.name || ('@' + acc.handle) }}</span>
+                      </a>
+
+                      <a v-for="acc in getCircleStaffAccounts(circleExtraInfo[circle.circle_id])" :key="'srch_st_'+circle.circle_id+'_'+acc.handle"
+                         :href="`https://x.com/${acc.handle}`" target="_blank" @click.stop
+                         class="inline-flex items-center gap-1 text-[11px] bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-bold transition shadow-xs active:scale-95"
+                         :title="acc.name ? `売り子: ${acc.name} (@${acc.handle})` : `売り子: @${acc.handle}`">
+                        <span class="shrink-0">🤝</span>
+                        <span class="truncate max-w-[130px]">{{ acc.name || ('@' + acc.handle) }}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- メンバー ＆ 頒布物タグ -->
+                  <div v-if="circleExtraInfo[circle.circle_id]?.members?.length || circleExtraInfo[circle.circle_id]?.tags?.length" class="flex flex-wrap gap-1">
+                    <span v-for="member in (circleExtraInfo[circle.circle_id]?.members || [])" :key="'m_'+member" 
+                          @click="toggleMemberFilter(member)"
+                          class="px-2 py-0.5 text-[11px] font-bold rounded-md border shadow-xs flex items-center gap-1 cursor-pointer hover:opacity-80 transition" 
+                          :class="isMemberSelected(member) ? 'ring-2 ring-offset-1 ring-blue-500 font-black' : ''"
+                          :style="getMemberStyle(member)">
+                      <span v-if="isMemberSelected(member)" class="text-[9px] font-black">✓</span>
+                      <span>{{ getMemberMark(member) }}</span>
+                      <span>{{ member }}</span>
+                    </span>
+                    <span v-for="tag in (circleExtraInfo[circle.circle_id]?.tags || [])" :key="tag"
+                          @click="filterItemTag = filterItemTag === tag ? '' : tag"
+                          class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-md border border-gray-200 cursor-pointer transition">
+                      #{{ tag }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 【第3段】下部アクションバー（お品書き有無がパッと見で判別できるメリハリ設計） -->
+                <div class="flex items-center gap-2 mt-2.5 pt-2 border-t border-gray-100">
+                  <button @click="openDetails(circle)"
+                          class="flex-1 min-h-[36px] flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-extrabold transition active:scale-95 cursor-pointer"
+                          :class="(circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length)
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
+                            : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200'">
+                    <span v-if="circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length">📸 お品書き・頒布物を見る</span>
+                    <span v-else>📄 詳細・関連サークル</span>
+                  </button>
+
+                  <!-- 公式速報ボタン -->
+                  <a :href="getCircleOfficialSearchUrl(circle, circleExtraInfo[circle.circle_id])" target="_blank"
+                     class="min-h-[36px] flex items-center justify-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-800 px-3 py-1.5 rounded-xl font-bold border border-blue-200 transition active:scale-95"
+                     title="サークル主・売り子の最新ツイートから完売・在庫・お品書き情報を検索">
+                    <span class="text-amber-500">⚡</span>
+                    <span>公式速報</span>
+                  </a>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- =========================================
+               リスト タブ (買い物リスト・予算・優先度)
+          ========================================== -->
+          <div v-show="activeTab === 'list'" class="flex flex-col min-h-full pb-28 md:pb-8 relative">
+            
+            <div class="sticky top-0 z-20 bg-gray-50/95 backdrop-blur-md p-2.5 md:p-3.5 border-b border-gray-200 shadow-sm space-y-2">
+              <!-- 達成度プログレスバー ＆ スリムヘッダー切替 -->
+              <div v-if="savedCount > 0">
+                <div class="flex justify-between items-center mb-1 px-0.5 gap-2">
+                  <span class="text-xs font-extrabold text-gray-700 flex items-center gap-1 shrink-0">
+                    <span>🎯 達成度</span>
+                    <span class="text-blue-700 font-mono ml-0.5">{{ boughtCount }}/{{ activeTargetCount }}<span class="text-gray-500 text-[10px] font-sans">件</span> ({{ progressPercent }}%)</span>
+                    <span v-if="soldoutCount > 0" class="text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                      💔{{ soldoutCount }}
+                    </span>
+                  </span>
+
+                  <div class="flex items-center gap-1.5">
+                    <!-- スリムヘッダー時のインライン警告 ＆ 金額サマリー -->
+                    <span v-if="isListHeaderSlim && (isOverBudget || isSpentOverBudget)" 
+                          class="text-[10px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 animate-pulse shrink-0">
+                      ⚠️+¥{{ (isSpentOverBudget ? overSpentAmount : overBudgetAmount).toLocaleString() }}
+                    </span>
+                    <span v-if="isListHeaderSlim" class="text-[11px] font-extrabold text-pink-800 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md font-mono">
+                      済:¥{{ spentPrice.toLocaleString() }} / 予:¥{{ totalPrice.toLocaleString() }}
+                    </span>
+                    <button @click="toggleManualListHeaderSlim"
+                            class="text-[10px] font-bold text-gray-500 hover:text-gray-800 bg-white border border-gray-200 px-2 py-0.5 rounded-lg flex items-center gap-0.5 cursor-pointer shadow-2xs shrink-0"
+                            :title="isListHeaderSlim ? '予算・シェア・速報パネルを展開' : 'ヘッダーをスリムに折りたたむ'">
+                      <span>{{ isListHeaderSlim ? '▼ 展開' : '▲ スリム' }}</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden shadow-inner">
+                  <div class="h-1.5 rounded-full transition-all duration-500 ease-out" 
+                       :class="isOverBudget ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-pink-500'"
+                       :style="{ width: progressPercent + '%' }"></div>
+                </div>
+              </div>
+
+              <!-- ★ 💰 予算上限オーバー警告アラート (通常時のみ大型表示、スリム時は上部にインライン縮小) -->
+              <div v-if="(isOverBudget || isSpentOverBudget) && !isListHeaderSlim" 
+                   class="bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-300 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-xs transition-all duration-200">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-7 h-7 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs animate-pulse">
+                    ⚠️
+                  </div>
+                  <div class="min-w-0">
+                    <div class="text-xs font-black text-rose-900 flex items-center gap-1.5 flex-wrap">
+                      <span v-if="isSpentOverBudget">購入額が予算上限を +¥{{ overSpentAmount.toLocaleString() }} 超過！</span>
+                      <span v-else>予定総額が予算（¥{{ budgetAmount.toLocaleString() }}）を +¥{{ overBudgetAmount.toLocaleString() }} 超過！</span>
+                      <span class="text-[10px] bg-rose-200/80 text-rose-900 px-1.5 py-0.2 rounded font-bold">要調整</span>
+                    </div>
+                    <div class="text-[11px] text-gray-600 truncate mt-0.5">
+                      購入予定: ¥{{ totalPrice.toLocaleString() }} / 現在購入済: ¥{{ spentPrice.toLocaleString() }}
+                    </div>
+                  </div>
+                </div>
+                <button @click="openBudgetModal" 
+                        class="text-xs font-bold bg-white hover:bg-rose-50 text-rose-800 border border-rose-300 px-3 py-1.5 rounded-xl shrink-0 transition shadow-2xs cursor-pointer">
+                  予算を変更
+                </button>
+              </div>
+
+              <!-- ツールバー ＆ 予算サマリー -->
+              <div class="bg-white rounded-2xl shadow-xs border border-gray-200/90 p-2 md:p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <!-- 左側: ソート ＆ 未購入フィルタ ＆ 当日コンパクト表示トグル -->
+                <div class="flex items-center justify-between sm:justify-start gap-1.5 flex-wrap">
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span class="text-[11px] font-bold text-gray-500 hidden sm:inline">並び:</span>
+                    <select v-model="sortOrder" class="h-8 text-xs font-bold bg-gray-50 border border-gray-300 rounded-xl px-2 outline-none focus:ring-2 focus:ring-pink-500 text-gray-800 cursor-pointer">
+                      <option value="route">🗺️ 巡回ルート (通路グラフ順)</option>
+                      <option value="space">配置順 (A→N・島別)</option>
+                      <option value="priority">優先度順 (S→B)</option>
+                      <option value="recent">🆕 お品書き新着順</option>
+                      <option value="default">追加順</option>
+                    </select>
+                    <div v-if="sortOrder === 'route'" class="inline-flex rounded-xl bg-rose-50 p-0.5 border border-rose-200 h-8 items-center">
+                      <button type="button" @click="routeOrderMode = 'priority'"
+                              class="px-2 h-6 rounded-lg text-[11px] font-extrabold transition cursor-pointer"
+                              :class="routeOrderMode === 'priority' ? 'bg-rose-600 text-white shadow-2xs' : 'text-rose-800 hover:bg-rose-100'">
+                        優先度順
+                      </button>
+                      <button type="button" @click="routeOrderMode = 'shortest'"
+                              class="px-2 h-6 rounded-lg text-[11px] font-extrabold transition cursor-pointer"
+                              :class="routeOrderMode === 'shortest' ? 'bg-rose-600 text-white shadow-2xs' : 'text-rose-800 hover:bg-rose-100'">
+                        最短順
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1.5">
+                    <label class="h-8 flex items-center gap-1 cursor-pointer text-xs font-bold transition-colors px-2.5 rounded-xl border select-none"
+                           :class="hideBought ? 'bg-pink-100 border-pink-300 text-pink-900 ring-1 ring-pink-200' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'">
+                      <input type="checkbox" v-model="hideBought" class="accent-pink-600 w-3.5 h-3.5">
+                      <span>未購入のみ</span>
+                    </label>
+
+                    <!-- ★ 当日買い回り用 コンパクト表示モード切替 -->
+                    <button @click="toggleListCompactMode"
+                            type="button"
+                            class="h-8 px-2.5 rounded-xl text-xs font-extrabold border transition flex items-center gap-1 cursor-pointer select-none shadow-2xs"
+                            :class="isListCompactMode ? 'bg-slate-800 text-white border-slate-900 ring-2 ring-slate-300' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'"
+                            title="入力欄をたたんで1画面に多くのサークルを表示する当日買い回り向けモード">
+                      <span>🏃</span>
+                      <span>コンパクト{{ isListCompactMode ? ':ON' : '' }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 右側: 予算・金額・シェア操作 (スリム化OFF時のみ表示) -->
+                <div v-show="!isListHeaderSlim" class="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                  <div class="flex flex-col items-start sm:items-end gap-0.5">
+                    <div class="flex items-center flex-wrap gap-1.5">
+                      <button type="button" class="text-[11px] font-bold text-gray-700 hover:text-blue-700 transition flex items-center gap-1 bg-gray-100 hover:bg-blue-50 px-2 py-0.5 rounded-lg border border-gray-200 cursor-pointer" @click="openBudgetModal" title="予算を設定する">
+                        <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>予算: {{ budgetAmount > 0 ? '¥' + budgetAmount.toLocaleString() : '設定' }}</span>
+                      </button>
+                      <span class="text-[11px] font-bold text-gray-600 font-mono">
+                        予定: ¥{{ totalPrice.toLocaleString() }}
+                      </span>
+                      <span v-if="soldoutSavings > 0" class="text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md flex items-center gap-0.5" title="完売・スキップにより浮いた金額">
+                        <span>💔 浮き +¥{{ soldoutSavings.toLocaleString() }}</span>
+                      </span>
+                    </div>
+                    <div class="text-xs sm:text-sm font-extrabold bg-pink-50 text-pink-900 px-2.5 py-1 rounded-lg border border-pink-200 flex items-center shadow-sm">
+                      <span>購入済:</span>
+                      <span class="text-sm sm:text-base font-mono ml-1">¥{{ spentPrice.toLocaleString() }}</span>
+                      <span v-if="budgetAmount > 0" class="text-[11px] font-mono ml-2 pl-2 border-l border-pink-200" :class="remainingBudget < 0 ? 'text-red-600 font-black' : 'text-pink-700 font-bold'">
+                        残: ¥{{ remainingBudget.toLocaleString() }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1.5">
+                    <button @click="shareToTwitter" class="w-9 h-9 bg-gray-900 text-white rounded-xl hover:bg-gray-700 active:scale-95 transition flex items-center justify-center shadow-sm cursor-pointer" title="X (Twitter) でシェア">
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    </button>
+                    <button @click="exportToText" class="w-9 h-9 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-100 active:scale-95 transition flex items-center justify-center shadow-sm cursor-pointer" title="テキストでクリップボードにコピー">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ★ 会場Xリアルタイム速報チップ (スマホ用・スリム化OFF時のみ表示) -->
+              <div v-show="!isListHeaderSlim" class="md:hidden flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs custom-scrollbar">
+                <span class="text-[10px] font-bold text-gray-600 shrink-0 flex items-center gap-1">
+                  <span class="text-amber-500 font-black">⚡</span>会場速報:
+                </span>
+                <a :href="getEventLiveSearchUrl('soldout')" target="_blank" 
+                   class="shrink-0 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
+                  <span>💔 完売情報</span>
+                </a>
+                <a :href="getEventLiveSearchUrl('line')" target="_blank" 
+                   class="shrink-0 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
+                  <span>🚶 列・最後尾</span>
+                </a>
+                <a :href="getEventLiveSearchUrl('all')" target="_blank" 
+                   class="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
+                  <span>📢 #VGGC12th 最新</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- リスト本体 -->
+            <div class="p-2.5 md:p-4">
+              <div v-if="sortedSavedCircles.length === 0" class="flex-1 flex flex-col items-center justify-center p-8 text-center mt-8 bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+                <div class="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-3 text-2xl">📝</div>
+                <p class="font-extrabold text-gray-700 mb-1">表示するサークルがありません</p>
+                <p v-if="hideBought && savedCount > 0" class="text-xs text-gray-500 mt-1 mb-3">（「未購入のみ」フィルターがオンになっています）</p>
+                <p v-else class="text-xs text-gray-500 mt-1 mb-4">「探す」タブから気になるサークルの「＋」ボタンを押して追加しましょう！</p>
+                <button v-if="hideBought && savedCount > 0" @click="hideBought = false" class="px-4 py-2 bg-pink-500 text-white text-xs font-bold rounded-xl shadow hover:bg-pink-600 transition">
+                  購入済・完売サークルも表示する
+                </button>
+                <button v-else @click="activeTab = 'search'" class="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl shadow hover:bg-blue-700 transition">
+                  🔍 サークルを探しに行く
+                </button>
+              </div>
+              
+              <ul v-else class="grid grid-cols-1 xl:grid-cols-2" :class="isListCompactMode ? 'gap-2' : 'gap-3.5'">
+                <template v-for="(circle, index) in sortedSavedCircles" :key="circle.circle_id">
+                  <!-- ★ ブロック区切りヘッダー (配置順ソート時のみ自動挿入、グリッド全幅) -->
+                  <li v-if="shouldShowBlockHeader(circle, index)" 
+                      class="col-span-full pt-3 pb-1 first:pt-0">
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-white border border-slate-200/90 shadow-2xs">
+                      <!-- 左側: ブロックバッジ & 周回状況 -->
+                      <div class="flex items-center gap-2 flex-wrap min-w-0">
+                        <span class="inline-flex items-center justify-center px-2.5 py-1 bg-slate-800 text-white font-black text-xs md:text-sm rounded-lg shadow-xs tracking-wide">
+                          {{ circle.space_sym }} ブロック
+                        </span>
+
+                        <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <span v-if="savedBlockStats[circle.space_sym]?.remainingCount === 0" 
+                                class="inline-flex items-center gap-1 text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                            <span>✓</span>
+                            <span>周回完了 (全{{ savedBlockStats[circle.space_sym]?.totalCount }}件)</span>
+                          </span>
+                          <span v-else class="flex items-center gap-1">
+                            <span>残り</span>
+                            <span class="text-pink-600 font-black text-sm">{{ savedBlockStats[circle.space_sym]?.remainingCount }}</span>
+                            <span class="text-slate-400">/</span>
+                            <span>全{{ savedBlockStats[circle.space_sym]?.totalCount }}件</span>
+                          </span>
+
+                          <span v-if="savedBlockStats[circle.space_sym]?.soldoutCount > 0" class="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                            完売 {{ savedBlockStats[circle.space_sym]?.soldoutCount }}
+                          </span>
+                        </span>
+
+                        <!-- 残り予定額 -->
+                        <span v-if="savedBlockStats[circle.space_sym]?.remainingPrice > 0" 
+                              class="text-[11px] font-mono font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                          残 ¥{{ savedBlockStats[circle.space_sym]?.remainingPrice.toLocaleString() }}
+                        </span>
+                      </div>
+
+                      <!-- 右側: マップで島を表示ボタン -->
+                      <button @click="selectBlockAndFocusMap(circle.space_sym, true)" 
+                              type="button"
+                              class="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200 hover:border-blue-300 rounded-lg text-xs font-extrabold transition-all shadow-2xs active:scale-95 flex items-center gap-1 cursor-pointer"
+                              title="マップ上でこの島（ブロック）の位置を表示">
+                        <span>📍</span>
+                        <span class="hidden sm:inline">マップで</span>
+                        <span>島を確認</span>
+                      </button>
+                    </div>
+                  </li>
+
+                  <li class="rounded-2xl shadow-sm border overflow-hidden relative transition-all duration-200 flex flex-col justify-between" 
+                      :class="[
+                        savedList[circle.circle_id].bought ? 'opacity-65 bg-gray-50 border-gray-200' : 
+                        savedList[circle.circle_id].soldout ? 'opacity-70 bg-gray-100/90 border-dashed border-gray-300' : 
+                        isCircleAbsent(circle.circle_id) ? 'bg-rose-50/50 border-rose-300' : 'bg-white border-gray-200/90 hover:border-pink-300'
+                      ]">
+
+                  <!-- =========================================================
+                       ★ パターンA: 当日コンパクト表示モード (1画面に多数収まる高密度・誤タップ防止設計)
+                  ========================================================== -->
+                  <div v-if="isListCompactMode && expandedCompactCircleId !== circle.circle_id" class="p-3 flex flex-col gap-2">
+                    <!-- 上段: 配置・優先度・サークル名・予定額・操作アイコン -->
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                        <!-- ★ 巡回ルート訪問順バッジ -->
+                        <span v-if="patrolOrderMap[circle.circle_id]"
+                              class="inline-flex items-center justify-center px-1.5 py-0.5 text-[11px] font-black rounded-lg bg-slate-900 text-white border border-slate-700 shadow-2xs shrink-0 font-mono"
+                              :title="`巡回ルート 訪問順 #${patrolOrderMap[circle.circle_id]}`">
+                          #{{ patrolOrderMap[circle.circle_id] }}
+                        </span>
+
+                        <button @click="jumpToMap(circle)"
+                                title="タップして会場マップで位置を確認"
+                                class="inline-flex items-center gap-0.5 px-2 py-0.5 text-xs font-extrabold rounded-lg border shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                                :class="isCircleAbsent(circle.circle_id) ? 'bg-rose-100 text-rose-800 border-rose-300 line-through' : 'bg-pink-600 text-white border-pink-700'">
+                          <span>📍{{ circle.space_sym }}-{{ circle.space_num }}</span>
+                        </button>
+
+                        <!-- 直近更新バッジ -->
+                        <span v-if="isRecentOshinagakiUpdate(circle.circle_id)"
+                              :title="`お品書き・頒布物情報（${getRelativeUpdateLabel(circle.circle_id)}）`"
+                              class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0">
+                          <span>🆕新着</span>
+                        </span>
+
+                        <!-- 優先度バッジ -->
+                        <span v-if="savedList[circle.circle_id].priority"
+                              class="px-1.5 py-0.5 text-[10px] font-extrabold rounded border shrink-0"
+                              :class="{
+                                'bg-red-500 text-white border-red-600': savedList[circle.circle_id].priority === 'S',
+                                'bg-yellow-400 text-slate-950 border-yellow-500': savedList[circle.circle_id].priority === 'A',
+                                'bg-blue-600 text-white border-blue-700': savedList[circle.circle_id].priority === 'B'
+                              }">
+                          優先:{{ savedList[circle.circle_id].priority }}
+                        </span>
+
+                        <h3 @click="openDetails(circle)" class="font-extrabold text-sm md:text-base leading-tight hover:text-pink-600 transition-colors cursor-pointer truncate max-w-full"
+                            :class="isCircleAbsent(circle.circle_id) ? 'text-gray-400 line-through decoration-rose-400' : 'text-gray-900'">
+                          {{ circle.circle_name }}
+                        </h3>
+                      </div>
+
+                      <!-- 右上: 予定額 ＆ 個別編集展開ボタン -->
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span v-if="savedList[circle.circle_id].price" class="px-2 py-0.5 bg-pink-50 text-pink-900 border border-pink-200 rounded-lg text-xs font-mono font-extrabold">
+                          ¥{{ Number(savedList[circle.circle_id].price).toLocaleString() }}
+                        </span>
+                        <span v-if="savedList[circle.circle_id].forWho" class="px-1.5 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded text-[10px] font-bold">
+                          {{ savedList[circle.circle_id].forWho }}
+                        </span>
+                        <button @click="expandedCompactCircleId = circle.circle_id"
+                                class="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-[11px] font-bold transition cursor-pointer"
+                                title="メモや金額・優先度を編集する">
+                          ✏️
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 中段: 選択した頒布物 ＆ メモ表示 (ある場合のみ) -->
+                    <div v-if="savedList[circle.circle_id].selectedItems?.length || savedList[circle.circle_id].memo"
+                         class="flex flex-wrap items-center gap-1.5 text-xs bg-amber-50/60 border border-amber-200/80 rounded-xl px-2.5 py-1.5">
+                      <span v-for="itName in (savedList[circle.circle_id].selectedItems || [])" :key="'cmp_it_'+itName"
+                            class="bg-white text-amber-950 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] font-bold flex items-center gap-1">
+                        <span class="text-amber-600 font-black">✓</span>
+                        <span>{{ itName }}</span>
+                        <span v-if="(savedList[circle.circle_id].itemQuantities?.[itName] || 1) > 1"
+                              class="px-1 py-0.2 bg-amber-500 text-white rounded text-[10px] font-mono font-black">
+                          ×{{ savedList[circle.circle_id].itemQuantities[itName] }}
+                        </span>
+                      </span>
+                      <span v-if="savedList[circle.circle_id].memo" class="text-gray-800 text-[11px] font-medium break-all">
+                        📝 {{ savedList[circle.circle_id].memo }}
+                      </span>
+                    </div>
+
+                    <!-- 下段: お品書き確認 ＆ 購入済・完売 ワンタップバー -->
+                    <div class="grid grid-cols-12 gap-1.5 pt-0.5">
+                      <button @click="openDetails(circle)"
+                              class="col-span-4 min-h-[38px] px-2 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border transition active:scale-95 cursor-pointer"
+                              :class="(circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length)
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                                : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'">
+                        <span>📸</span>
+                        <span class="truncate">{{ (circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length) ? 'お品書き' : '詳細' }}</span>
+                      </button>
+
+                      <template v-if="!isReadOnly">
+                        <button @click="toggleBought(circle.circle_id)"
+                                class="col-span-5 min-h-[38px] px-2 py-1.5 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-1 border select-none cursor-pointer"
+                                :class="savedList[circle.circle_id].bought 
+                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-400' 
+                                  : 'bg-pink-600 text-white border-pink-700 shadow-xs hover:bg-pink-700 active:scale-95'">
+                          <span>{{ savedList[circle.circle_id].bought ? '✓ 購入済' : '🛒 済にする' }}</span>
+                        </button>
+
+                        <button @click="toggleSoldout(circle.circle_id)"
+                                class="col-span-3 min-h-[38px] px-1.5 py-1.5 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-0.5 border select-none cursor-pointer"
+                                :class="savedList[circle.circle_id].soldout 
+                                  ? 'bg-rose-100 text-rose-900 border-rose-400' 
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-rose-50'">
+                          <span>💔</span>
+                          <span class="truncate">{{ savedList[circle.circle_id].soldout ? '完売中' : '完売' }}</span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- =========================================================
+                       ★ パターンB: 通常フル表示モード (またはコンパクト中の個別編集展開時)
+                  ========================================================== -->
+                  <template v-else>
+                    <!-- リストから削除ボタン -->
+                    <div class="absolute top-3 right-3 flex items-center gap-1 z-10">
+                      <button v-if="isListCompactMode && expandedCompactCircleId === circle.circle_id"
+                              @click="expandedCompactCircleId = null"
+                              class="px-2.5 py-1 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow hover:bg-slate-700 cursor-pointer">
+                        ▲ 編集完了
+                      </button>
+                      <button v-if="!isReadOnly" @click="toggleSave(circle.circle_id)" 
+                              title="買い物リストから削除"
+                              class="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                      </button>
+                    </div>
+
+                    <!-- 【第1段・第2段】サークル基本情報 ＆ 買うもの・リンク -->
+                    <div class="p-3.5 md:p-4 flex flex-col gap-2.5 relative">
+                      <!-- 配置番号とステータスバッジ -->
+                      <div class="flex items-center gap-1.5 flex-wrap pr-16">
+                        <!-- ★ 巡回ルート訪問順バッジ -->
+                        <span v-if="patrolOrderMap[circle.circle_id]"
+                              class="inline-flex items-center justify-center px-2 py-1 text-xs font-black rounded-lg bg-slate-900 text-white border border-slate-700 shadow-sm shrink-0 font-mono"
+                              :title="`巡回ルート 訪問順 #${patrolOrderMap[circle.circle_id]}`">
+                          🧭 #{{ patrolOrderMap[circle.circle_id] }}
+                        </span>
+
+                        <button @click="jumpToMap(circle)"
+                                title="タップして会場マップで位置を確認"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-extrabold rounded-lg border shadow-sm transition active:scale-95 cursor-pointer"
+                                :class="isCircleAbsent(circle.circle_id) ? 'bg-rose-100 text-rose-800 border-rose-300 line-through' : 'bg-pink-600 text-white border-pink-700 hover:bg-pink-700'">
+                          <span>📍</span>
+                          <span>{{ circle.space_sym }}-{{ circle.space_num }}</span>
+                        </button>
+
+                        <!-- 直近更新バッジ -->
+                        <span v-if="isRecentOshinagakiUpdate(circle.circle_id)"
+                              :title="`お品書き・頒布物情報（${getRelativeUpdateLabel(circle.circle_id)}）`"
+                              class="inline-flex items-center gap-0.5 px-2 py-0.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold rounded-md shadow-2xs">
+                          <span>🆕 新着</span>
+                        </span>
+
+                        <span v-if="isCircleAbsent(circle.circle_id)" class="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-600 text-white text-xs font-bold rounded-md shadow-sm">
+                          <span>🚫 当日不参加</span>
+                        </span>
+                        <span v-if="savedList[circle.circle_id].soldout" class="inline-block px-2 py-0.5 bg-rose-100 text-rose-800 text-xs font-bold rounded-md border border-rose-300 shadow-sm">
+                          💔 完売・スキップ
+                        </span>
+                        <span v-else-if="savedList[circle.circle_id].bought" class="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-md border border-emerald-300 shadow-sm">
+                          ✓ 購入済
+                        </span>
+                      </div>
+
+                      <!-- サークル名・代表者 ＆ Xリンク -->
+                      <div class="pr-6">
+                        <h3 @click="openDetails(circle)" class="font-extrabold text-base md:text-lg leading-snug hover:text-pink-600 transition-colors cursor-pointer"
+                            :class="isCircleAbsent(circle.circle_id) ? 'text-gray-400 line-through decoration-rose-400' : 'text-gray-900'">
+                          {{ circle.circle_name }}
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                          <span v-if="circle.penname" class="text-xs text-gray-600 font-medium">代表: {{ circle.penname }}</span>
+
+                          <a v-for="acc in getCircleAuthorAccounts(circle, circleExtraInfo[circle.circle_id])" :key="'lst_au_'+circle.circle_id+'_'+acc.handle"
+                             :href="`https://x.com/${acc.handle}`" target="_blank" @click.stop
+                             class="inline-flex items-center gap-1 text-[11px] bg-gray-900 hover:bg-gray-700 text-white px-2 py-0.5 rounded-md font-bold transition shadow-xs active:scale-95"
+                             :title="acc.name ? `サークル主: ${acc.name} (@${acc.handle})` : `サークル主: @${acc.handle}`">
+                            <svg class="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            <span class="truncate max-w-[130px]">{{ acc.name || ('@' + acc.handle) }}</span>
+                          </a>
+
+                          <a v-for="acc in getCircleStaffAccounts(circleExtraInfo[circle.circle_id])" :key="'lst_st_'+circle.circle_id+'_'+acc.handle"
+                             :href="`https://x.com/${acc.handle}`" target="_blank" @click.stop
+                             class="inline-flex items-center gap-1 text-[11px] bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-bold transition shadow-xs active:scale-95"
+                             :title="acc.name ? `売り子: ${acc.name} (@${acc.handle})` : `売り子: @${acc.handle}`">
+                            <span class="shrink-0">🤝</span>
+                            <span class="truncate max-w-[130px]">{{ acc.name || ('@' + acc.handle) }}</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      <!-- メンバータグ ＆ 頒布物タグ -->
+                      <div v-if="circleExtraInfo[circle.circle_id]?.members?.length || circleExtraInfo[circle.circle_id]?.tags?.length" class="flex flex-wrap gap-1">
+                        <span v-for="member in (circleExtraInfo[circle.circle_id]?.members || [])" :key="'m_'+member" class="px-2 py-0.5 text-[11px] font-bold rounded-md border shadow-xs flex items-center gap-0.5" :style="getMemberStyle(member)">
+                          <span>{{ getMemberMark(member) }}</span>
+                          <span>{{ member }}</span>
+                        </span>
+                        <span v-for="tag in (circleExtraInfo[circle.circle_id]?.tags || [])" :key="tag" class="px-2 py-0.5 bg-gray-100 text-gray-700 text-[11px] font-bold rounded-md border border-gray-200">
+                          #{{ tag }}
+                        </span>
+                      </div>
+
+                      <!-- ★ 選択中のお品書き商品バッジ一覧 -->
+                      <div v-if="savedList[circle.circle_id].selectedItems?.length" 
+                           @click="openDetails(circle)"
+                           class="mt-0.5 p-2.5 bg-amber-50/70 hover:bg-amber-50 border border-amber-200 rounded-xl cursor-pointer transition space-y-1.5">
+                        <div class="text-[11px] font-extrabold text-amber-900 flex items-center justify-between">
+                          <span>📦 選択中の頒布物 ({{ getCircleTotalItemCount(circle.circle_id) }}点):</span>
+                          <span class="text-[10px] text-amber-700 underline">変更する</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                          <span v-for="itName in savedList[circle.circle_id].selectedItems" :key="itName" 
+                                class="text-xs bg-white text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-sm">
+                            <span class="text-amber-600 font-black">✓</span>
+                            <span>{{ itName }}</span>
+                            <span v-if="(savedList[circle.circle_id].itemQuantities?.[itName] || 1) > 1"
+                                  class="px-1.5 py-0.2 bg-amber-500 text-white rounded-md text-[10px] font-mono font-black">
+                              ×{{ savedList[circle.circle_id].itemQuantities[itName] }}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- 情報確認ボタンバー（お品書き・公式速報・目撃/列：押しやすいサイズに統一） -->
+                      <div class="grid grid-cols-3 gap-1.5 pt-1">
+                        <button @click="openDetails(circle)"
+                                class="min-h-[38px] flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded-xl font-bold border transition shadow-sm active:scale-95 cursor-pointer"
+                                :class="(circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length)
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                                  : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'">
+                          <span>📸</span>
+                          <span class="truncate">{{ (circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length) ? 'お品書き' : '詳細/X' }}</span>
+                        </button>
+
+                        <a :href="getCircleOfficialSearchUrl(circle, circleExtraInfo[circle.circle_id])" target="_blank"
+                           class="min-h-[38px] flex items-center justify-center gap-1 text-xs bg-blue-50 text-blue-800 hover:bg-blue-100 px-2 py-1.5 rounded-xl font-bold border border-blue-200 transition shadow-sm active:scale-95"
+                           title="サークル主・売り子の最新ツイートから完売・在庫・列情報を検索">
+                          <span class="text-amber-500">⚡</span>
+                          <span class="truncate">公式速報</span>
+                        </a>
+
+                        <a :href="getCirclePublicSearchUrl(circle)" target="_blank"
+                           class="min-h-[38px] flex items-center justify-center gap-1 text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-xl font-bold border border-gray-200 transition shadow-sm active:scale-95"
+                           title="参加者の目撃ツイートから完売や最後尾情報を検索">
+                          <span>👥</span>
+                          <span class="truncate">目撃/列</span>
+                        </a>
+                      </div>
+                    </div>
+                    
+                    <!-- 【第3段】お買い物プラン入力 ＆ 現場ステータストグル (44pxタッチ対応) -->
+                    <div class="bg-gray-50/90 p-3 md:p-3.5 border-t border-gray-200/80 flex flex-col gap-2.5">
+                      <!-- 優先度・予算・誰用 (高コントラスト化) -->
+                      <div class="grid grid-cols-12 gap-2">
+                        <select v-model="savedList[circle.circle_id].priority" :disabled="isReadOnly" 
+                                class="col-span-5 h-9 text-xs border border-gray-300 rounded-xl px-2 bg-white focus:ring-2 focus:ring-pink-400 outline-none font-bold cursor-pointer" 
+                                :class="priorityColors[savedList[circle.circle_id].priority]">
+                          <option value="">優先度: 未設定</option>
+                          <option value="S">優先: S (最優先)</option>
+                          <option value="A">優先: A (買いたい)</option>
+                          <option value="B">優先: B (見に行く)</option>
+                        </select>
+
+                        <div class="col-span-4 h-9 flex items-center text-xs border border-gray-300 rounded-xl bg-white overflow-hidden focus-within:ring-2 focus-within:ring-pink-400">
+                          <span class="pl-2.5 pr-1 text-gray-500 font-bold">¥</span>
+                          <input type="number" v-model.number="savedList[circle.circle_id].price" :readonly="isReadOnly" placeholder="予定額" 
+                                 class="w-full py-1 pr-2.5 bg-transparent outline-none text-right font-mono font-bold text-gray-900 placeholder-gray-400">
+                        </div>
+
+                        <input type="text" v-model="savedList[circle.circle_id].forWho" :readonly="isReadOnly" placeholder="誰用？" 
+                               class="col-span-3 h-9 text-xs border border-gray-300 rounded-xl px-2.5 bg-white outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 placeholder-gray-400 font-medium">
+                      </div>
+
+                      <!-- メモ欄 (屋外でも見やすいコントラスト) -->
+                      <textarea v-model="savedList[circle.circle_id].memo" :readonly="isReadOnly" placeholder="メモを入力（例: 新刊セット、アクスタ、スケブお願いする）" 
+                                class="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none h-12 bg-white text-gray-900 placeholder-gray-400 leading-snug"></textarea>
+                      
+                      <!-- 現場用大型アクションボタン: 購入済み & 完売 (高さ44px確保) -->
+                      <div v-if="!isReadOnly" class="grid grid-cols-12 gap-2 pt-0.5">
+                        <!-- 購入済みトグル (8カラム) -->
+                        <button @click="toggleBought(circle.circle_id)"
+                                class="col-span-8 min-h-[44px] py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 border select-none cursor-pointer"
+                                :class="savedList[circle.circle_id].bought 
+                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-400 ring-2 ring-emerald-300/60 shadow-inner' 
+                                  : 'bg-pink-600 text-white border-pink-700 shadow-sm hover:bg-pink-700 active:scale-95'">
+                          <svg v-if="savedList[circle.circle_id].bought" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                          <svg v-else class="w-4 h-4 opacity-95 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                          <span class="truncate">{{ savedList[circle.circle_id].bought ? '✓ 購入済 (タップで戻す)' : '🛒 購入済みにする' }}</span>
+                        </button>
+
+                        <!-- 完売・スキップトグル (4カラム) -->
+                        <button @click="toggleSoldout(circle.circle_id)"
+                                class="col-span-4 min-h-[44px] py-2.5 px-2 rounded-xl font-extrabold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 border select-none cursor-pointer"
+                                :class="savedList[circle.circle_id].soldout 
+                                  ? 'bg-rose-100 text-rose-900 border-rose-400 ring-2 ring-rose-300/60 shadow-inner' 
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-rose-50 hover:text-rose-800 hover:border-rose-300 active:scale-95 shadow-sm'">
+                          <span>💔</span>
+                          <span class="truncate">{{ savedList[circle.circle_id].soldout ? '完売中' : '完売' }}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </li>
+              </template>
+            </ul>
+            </div>
+          </div>
+
+          <!-- =========================================
+               準備・予定 タブ (当日タイムスケジュール＆準備ダッシュボード)
+          ========================================== -->
+          <MemoDashboard 
+            ref="memoDashboardRef"
+            v-show="activeTab === 'memo'" 
+            v-model:freeMemoText="freeMemoText" 
+            v-model:timelineEvents="timelineEvents"
+            :circles="circles"
+            :saved-list="savedList"
+            :is-read-only="isReadOnly" 
+            :currency-breakdown="currencyBreakdown" 
+            @open-circle="openDetails"
+            @jump-to-map="jumpToMap"
+          />
+
+        </div>
+
+        <!-- =========================================
+             サークル参加モード（簡易POSレジ機能 v1: M-15-16 Black Stance）
+             タブレット横画面・スマホともに100%フルスクリーン表示
+        ========================================== -->
+        <CircleRegisterPanel
+          v-if="isCircleModeEnabled"
+          v-show="activeTab === 'register'"
+          :circle="registerCircle"
+          :circle-extra="registerCircleExtra"
+          :user="user"
+          :is-online="isOnline"
+          :circle-id="REGISTER_CIRCLE_ID"
+          @exit-register="exitRegisterMode"
+        />
+      </div>
+    </div>
+
+    <!-- スマホ専用ボトムナビゲーション (44px以上のタッチ領域確保 / レジモード時は非表示にして全画面化) -->
+    <div v-show="activeTab !== 'register'" class="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 flex justify-around items-stretch pb-safe fixed bottom-0 w-full z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+      <button @click="activeTab = 'map'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'map' ? 'text-blue-600 font-extrabold bg-blue-50/40' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'map'" class="absolute top-0 inset-x-4 h-0.5 bg-blue-600 rounded-b-full"></span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+        <span class="text-[11px] tracking-tight">マップ</span>
+      </button>
+      <button @click="activeTab = 'search'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'search' ? 'text-blue-600 font-extrabold bg-blue-50/40' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'search'" class="absolute top-0 inset-x-4 h-0.5 bg-blue-600 rounded-b-full"></span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <span class="text-[11px] tracking-tight">探す</span>
+      </button>
+      <button @click="activeTab = 'list'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'list' ? 'text-pink-600 font-extrabold bg-pink-50/40' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'list'" class="absolute top-0 inset-x-4 h-0.5 bg-pink-600 rounded-b-full"></span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+        <span class="text-[11px] tracking-tight">リスト</span>
+        <span v-if="savedCount > 0" class="absolute top-1.5 right-3 bg-pink-600 text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-extrabold shadow-xs">
+          <span v-if="hideBought">{{ Math.max(0, activeTargetCount - boughtCount) }}</span>
+          <span v-else>{{ savedCount }}</span>
+        </span>
+      </button>
+      <button @click="activeTab = 'memo'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'memo' ? 'text-emerald-600 font-extrabold bg-emerald-50/40' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'memo'" class="absolute top-0 inset-x-4 h-0.5 bg-emerald-600 rounded-b-full"></span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span class="text-[11px] tracking-tight">準備・予定</span>
+        <span v-if="timelineEvents.length > 0" class="absolute top-1 right-2.5 px-1 min-w-[17px] h-4 bg-emerald-600 text-white rounded-full text-[9px] font-mono font-bold flex items-center justify-center shadow-xs">
+          {{ timelineEvents.length }}
+        </span>
+      </button>
+      <button v-if="isCircleModeEnabled" @click="activeTab = 'register'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'register' ? 'text-amber-600 font-extrabold bg-amber-50/60' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'register'" class="absolute top-0 inset-x-4 h-0.5 bg-amber-500 rounded-b-full"></span>
+        <span class="text-base leading-none">🏪</span>
+        <span class="text-[11px] tracking-tight">レジ</span>
+      </button>
+    </div>
+
+    <!-- 初回・ヘルプモーダル -->
+    <HelpModal :show="showHelpModal" @close="showHelpModal = false" />
+
+    <!-- ★ お知らせ・タイムライン通知モーダル -->
+    <NotificationModal 
+      :is-open="showNotificationModal"
+      :notifications="notifications"
+      :read-notification-ids="readNotificationIds"
+      @close="showNotificationModal = false"
+      @mark-as-read="markNotificationAsRead"
+      @mark-all-as-read="markAllNotificationsAsRead"
+      @action-click="handleNotificationAction"
+      @test-timeline-notify="triggerTimelineTest"
+    />
+
+    <!-- ★サークル詳細 / お品書き モーダル (PC2カラム ＆ スマホタブ切り替え対応) -->
+    <CircleDetailModal 
+      :circle="selectedCircle" 
+      :circle-extra-info="circleExtraInfo" 
+      :saved-list="savedList" 
+      :is-read-only="isReadOnly" 
+      :related-circles="relatedCircles" 
+      :is-tweet-loading="isTweetLoading" 
+      :is-online="isOnline"
+      @close="selectedCircle = null" 
+      @toggle-save="toggleSave" 
+      @toggle-bought="toggleBought"
+      @toggle-soldout="toggleSoldout"
+      @toggle-item="toggleItemSelection" 
+      @change-item-quantity="changeItemQuantity"
+      @open-circle="openDetails" 
+      @jump-to-map="jumpToMap"
+      @add-timeline="openAddTimelineForCircle"
+    />
+
+    <!-- ★予算設定モーダル -->
+    <BudgetModal 
+      :show="showBudgetModal" 
+      :initial-budget="savedList['__BUDGET__'] || ''" 
+      @close="showBudgetModal = false" 
+      @save="saveBudget" 
+    />
+
+    <!-- ログイン/登録モーダル -->
+    <AuthModal :show="showAuthModal" :is-online="isOnline" @close="showAuthModal = false" />
+
+    <!-- 共有モーダル -->
+    <ShareModal :show="showShareModal" :is-public="isPublic" :share-url="shareUrl" @close="showShareModal = false" @toggle-public="onTogglePublic" />
+  
+</div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import mapCoordsData from './map_coords.json';
+import mapRoutesData from './map_routes.json';
+import { calculatePatrolRoute } from './utils/routePlanner';
+import { supabaseClient } from './supabase';
+import { STORAGE_KEY, vspoDict, priorityColors } from './constants';
+import { calculateCurrencyBreakdown } from './utils/currency';
+import { getEventCountdown, checkScheduleActive } from './utils/countdown';
+import { getMemberStyle, getMemberMark } from './utils/memberStyle';
+import { getCircleOfficialSearchUrl, getCirclePublicSearchUrl, getEventLiveSearchUrl, getCircleAuthorTwitterIds, getCircleStaffTwitterIds, getCircleAuthorAccounts, getCircleStaffAccounts, parseOshinagakiUrls, parseOshinagakiUrlType } from './utils/xSearch';
+
+import BudgetModal from './components/BudgetModal.vue';
+import MemoDashboard from './components/MemoDashboard.vue';
+import CircleDetailModal from './components/CircleDetailModal.vue';
+import HelpModal from './components/HelpModal.vue';
+import AuthModal from './components/AuthModal.vue';
+import ShareModal from './components/ShareModal.vue';
+import EventCountdownBar from './components/EventCountdownBar.vue';
+import NotificationModal from './components/NotificationModal.vue';
+import PwaUpdateToast from './components/PwaUpdateToast.vue';
+import CircleRegisterPanel from './components/CircleRegisterPanel.vue';
+import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
+
+        // ★ サークル参加モード（簡易レジ v1: M-15-16 Black Stance / Jamj__Otaku 専用解放）
+        const REGISTER_CIRCLE_ID = '10ebdde686d91dfe1ab4a63376c7b377';
+        const hasRegisterRowInCloud = ref(false);
+
+        const circles = ref([]);
+        const blocks = ref([]);
+        const loading = ref(true);
+        const searchQuery = ref('');
+        const filterBlock = ref('');
+        const selectedMembers = ref([]);
+        const toggleMemberFilter = (member) => {
+          const idx = selectedMembers.value.indexOf(member);
+          if (idx >= 0) {
+            selectedMembers.value.splice(idx, 1);
+          } else {
+            selectedMembers.value.push(member);
+          }
+        };
+        const isMemberSelected = (member) => selectedMembers.value.includes(member);
+        const filterItemTag = ref('');
+        const filterHasOshinagaki = ref(false);
+        const hideAbsent = ref(false);
+        const showSearchFilters = ref(false);
+        const searchInputRef = ref(null);
+        const activeTab = ref('search');
+        const lastNonRegisterTab = ref('search');
+        watch(activeTab, (newTab, oldTab) => {
+          if (newTab !== 'register' && newTab) {
+            lastNonRegisterTab.value = newTab;
+          } else if (newTab === 'register' && oldTab && oldTab !== 'register') {
+            lastNonRegisterTab.value = oldTab;
+          }
+        });
+        const exitRegisterMode = () => {
+          activeTab.value = lastNonRegisterTab.value || 'search';
+        };
+        const isTweetLoading = ref(false);
+        
+        const savedList = ref({});
+        const freeMemoText = ref('');
+        const timelineEvents = ref([]);
+        const memoDashboardRef = ref(null);
+        
+        const user = ref(null);
+        const listId = ref(null);
+        const isPublic = ref(false);
+        const isSaving = ref(false);
+        const isReadOnly = ref(false);
+        const isOnline = ref(navigator.onLine);
+        
+        const showAuthModal = ref(false);
+        const showShareModal = ref(false);
+        const showHelpModal = ref(false);
+        const showNotificationModal = ref(false);
+        const notifications = ref([]);
+        const readNotificationIds = ref(JSON.parse(localStorage.getItem('vggc_read_notifications') || '[]'));
+        
+        const unreadNotificationsCount = computed(() => {
+          return notifications.value.filter(n => !readNotificationIds.value.includes(n.id)).length;
+        });
+
+        const urgentNotification = computed(() => {
+          return notifications.value.find(n => n.type === 'urgent' && !readNotificationIds.value.includes(n.id)) || null;
+        });
+
+        const targetSpace = ref(null);
+        const focusedMapCircle = ref(null);
+        const showListPins = ref(true);
+        const showCompletedPins = ref(false);
+        const isMapImageError = ref(false);
+        const retryMapImage = () => {
+          isMapImageError.value = false;
+        };
+        const showPcBlockPanel = ref(true);
+        const isListCompactMode = ref(localStorage.getItem('vggc12th_list_compact') === 'true');
+        const expandedCompactCircleId = ref(null);
+        const mainScrollContainer = ref(null);
+        const isListHeaderSlim = ref(false);
+        let isManualHeaderToggle = false;
+
+        const toggleManualListHeaderSlim = () => {
+          isManualHeaderToggle = true;
+          isListHeaderSlim.value = !isListHeaderSlim.value;
+        };
+
+        const handleListScroll = (e) => {
+          if (activeTab.value !== 'list' || isManualHeaderToggle) return;
+          const target = e?.target || mainScrollContainer.value || document.documentElement;
+          const y = target.scrollTop ?? window.scrollY ?? 0;
+          if (y > 50 && !isListHeaderSlim.value) {
+            isListHeaderSlim.value = true;
+          } else if (y <= 15 && isListHeaderSlim.value) {
+            isListHeaderSlim.value = false;
+          }
+        };
+        const isPanningMap = ref(false);
+        const mapCoords = ref((mapCoordsData && mapCoordsData.default) ? mapCoordsData.default : (mapCoordsData || {}));
+        const mapRoutes = ref((mapRoutesData && mapRoutesData.default) ? mapRoutesData.default : (mapRoutesData || {}));
+
+        // ★ 巡回ルート描画ステート (デフォルト: ルート表示ON / 優先度順 / 最後のブースで終了 / 未購入対象)
+        const showRouteOverlay = ref(localStorage.getItem('vggc12th_show_route') !== 'false');
+        const routeOrderMode = ref(localStorage.getItem('vggc12th_route_order_mode') || 'priority'); // 'priority' | 'shortest'
+        const routeTargetFilter = ref(localStorage.getItem('vggc12th_route_target_filter') || 'all'); // 'all' | 'S' | 'SA' | 'include_done'
+        const routeReturnToEntrance = ref(localStorage.getItem('vggc12th_route_return') === 'true');
+
+        watch(showRouteOverlay, (v) => { try { localStorage.setItem('vggc12th_show_route', String(v)); } catch (e) {} });
+        watch(routeOrderMode, (v) => { try { localStorage.setItem('vggc12th_route_order_mode', v); } catch (e) {} });
+        watch(routeTargetFilter, (v) => { try { localStorage.setItem('vggc12th_route_target_filter', v); } catch (e) {} });
+        watch(routeReturnToEntrance, (v) => { try { localStorage.setItem('vggc12th_route_return', String(v)); } catch (e) {} });
+
+        const toggleRouteOverlay = () => {
+          showRouteOverlay.value = !showRouteOverlay.value;
+          if (showRouteOverlay.value) {
+            showListPins.value = true;
+          }
+        };
+
+        const toggleListCompactMode = () => {
+          isListCompactMode.value = !isListCompactMode.value;
+          expandedCompactCircleId.value = null;
+          try {
+            localStorage.setItem('vggc12th_list_compact', String(isListCompactMode.value));
+          } catch (e) {}
+        };
+
+        const changeMapScale = (delta) => {
+          const oldScale = mapScale.value;
+          const newScale = Math.max(0.5, Math.min(2.5, +(oldScale + delta).toFixed(2)));
+          if (newScale === oldScale) return;
+
+          // 現在の表示中心座標を記録してズーム後も中心を維持する
+          const containers = document.querySelectorAll('.map-container');
+          const centers = [];
+          containers.forEach(c => {
+            if (c.clientWidth > 0) {
+              centers.push({
+                el: c,
+                cx: (c.scrollLeft + c.clientWidth / 2) / oldScale,
+                cy: (c.scrollTop + c.clientHeight / 2) / oldScale
+              });
+            }
+          });
+
+          mapScale.value = newScale;
+          nextTick(() => {
+            centers.forEach(({ el, cx, cy }) => {
+              el.scrollLeft = Math.max(0, cx * newScale - el.clientWidth / 2);
+              el.scrollTop = Math.max(0, cy * newScale - el.clientHeight / 2);
+            });
+          });
+        };
+
+        const handleMapWheel = (e) => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            changeMapScale(e.deltaY < 0 ? 0.15 : -0.15);
+          }
+        };
+
+        let mapPanState = null;
+        const startMapPan = (e) => {
+          if (e.button !== 0 || isDraggingPin) return;
+          const container = e.currentTarget;
+          mapPanState = {
+            container,
+            startX: e.clientX,
+            startY: e.clientY,
+            scrollLeft: container.scrollLeft,
+            scrollTop: container.scrollTop
+          };
+        };
+
+        const moveMapPan = (e) => {
+          if (!mapPanState || isDraggingPin) return;
+          const dx = e.clientX - mapPanState.startX;
+          const dy = e.clientY - mapPanState.startY;
+          if (!isPanningMap.value && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            isPanningMap.value = true;
+          }
+          if (isPanningMap.value) {
+            e.preventDefault();
+            mapPanState.container.scrollLeft = mapPanState.scrollLeft - dx;
+            mapPanState.container.scrollTop = mapPanState.scrollTop - dy;
+          }
+        };
+
+        const endMapPan = () => {
+          mapPanState = null;
+          isPanningMap.value = false;
+        };
+
+        const clearMapFocus = () => {
+          targetSpace.value = null;
+          focusedMapCircle.value = null;
+        };
+
+        const getCircleMapPos = (circle) => {
+          if (!circle) return null;
+          const spaceId = `${circle.space_sym}-${circle.space_num}`;
+          if (mapCoords.value[spaceId]) return mapCoords.value[spaceId];
+          if (circle.space_num && circle.space_num.includes('-')) {
+            const baseSpace = `${circle.space_sym}-${circle.space_num.split('-')[0]}`;
+            if (mapCoords.value[baseSpace]) return mapCoords.value[baseSpace];
+          }
+          if (mapCoords.value[circle.space_sym]) return mapCoords.value[circle.space_sym];
+          return null;
+        };
+
+        const activeListMapPins = computed(() => {
+          if (!showListPins.value) return [];
+          const result = [];
+          circles.value.forEach(c => {
+            const saved = savedList.value[c.circle_id];
+            if (!saved) return;
+            const isCompleted = Boolean(saved.bought || saved.soldout || isCircleAbsent(c.circle_id));
+            if (isCompleted && !showCompletedPins.value) return;
+            const pos = getCircleMapPos(c);
+            if (!pos) return;
+            const priority = saved.priority || '';
+            result.push({
+              circle: c,
+              circle_id: c.circle_id,
+              spaceLabel: `${c.space_sym}-${c.space_num}`,
+              x: pos.x,
+              y: pos.y,
+              priority,
+              isCompleted
+            });
+          });
+          // 描画順：完了済 -> 未設定 -> B -> A -> S の順にし、Sが必ず最前面に来るようにする
+          const order = { '': 1, 'B': 2, 'A': 3, 'S': 4 };
+          result.sort((a, b) => {
+            if (a.isCompleted !== b.isCompleted) return a.isCompleted ? -1 : 1;
+            return (order[a.priority] || 0) - (order[b.priority] || 0);
+          });
+          return result;
+        });
+
+        // 配置順（A-01 -> N-40）でソートされたリストピンの配列（◀ ▶ 順送り用）
+        const spaceOrderedListPins = computed(() => {
+          return [...activeListMapPins.value].sort((a, b) => {
+            if (a.circle.space_sym !== b.circle.space_sym) {
+              return a.circle.space_sym.localeCompare(b.circle.space_sym);
+            }
+            return parseInt(a.circle.space_num) - parseInt(b.circle.space_num);
+          });
+        });
+
+        // ★ 巡回ルート対象ピンの抽出（未購入のみ / Sのみ / S+Aのみ / 済も含む）
+        const routeTargetPins = computed(() => {
+          const result = [];
+          circles.value.forEach(c => {
+            const saved = savedList.value[c.circle_id];
+            if (!saved) return;
+            const isCompleted = Boolean(saved.bought || saved.soldout || isCircleAbsent(c.circle_id));
+            if (routeTargetFilter.value !== 'include_done' && isCompleted) return;
+            const priority = saved.priority || '';
+            if (routeTargetFilter.value === 'S' && priority !== 'S') return;
+            if (routeTargetFilter.value === 'SA' && priority !== 'S' && priority !== 'A') return;
+            const pos = getCircleMapPos(c);
+            if (!pos) return;
+            result.push({
+              circle: c,
+              circle_id: c.circle_id,
+              spaceLabel: `${c.space_sym}-${c.space_num}`,
+              x: pos.x,
+              y: pos.y,
+              priority,
+              isCompleted
+            });
+          });
+          return result;
+        });
+
+        // ★ 通路グラフ（map_routes.json）に沿った巡回ルートの計算結果
+        const activePatrolRoute = computed(() => {
+          return calculatePatrolRoute(mapRoutes.value, routeTargetPins.value, {
+            orderMode: routeOrderMode.value,
+            returnToEntrance: routeReturnToEntrance.value
+          });
+        });
+
+        // ★ サークルID -> 訪問順番号 (1, 2, 3...) のマップ
+        const patrolOrderMap = computed(() => {
+          const map = {};
+          const stops = activePatrolRoute.value?.orderedStops || [];
+          stops.forEach(stop => {
+            map[stop.circle_id] = stop.visitOrder;
+          });
+          return map;
+        });
+
+        const formatSvgPoints = (pts) => {
+          if (!Array.isArray(pts) || pts.length === 0) return '';
+          return pts.map(p => `${p.x},${p.y}`).join(' ');
+        };
+
+        const getRouteBadgeStyle = (stop) => {
+          const scale = mapScale.value;
+          const isSelected = focusedMapCircle.value && focusedMapCircle.value.circle_id === stop.circle_id;
+          let bg = '#059669'; // 未設定: Emerald
+          let color = '#ffffff';
+          let border = '#ffffff';
+
+          if (stop.isCompleted) {
+            bg = '#64748b';
+          } else if (stop.priority === 'S') {
+            bg = '#dc2626';
+          } else if (stop.priority === 'A') {
+            bg = '#facc15';
+            color = '#0f172a';
+            border = '#713f12';
+          } else if (stop.priority === 'B') {
+            bg = '#2563eb';
+          }
+
+          return {
+            left: (stop.badgeX * scale) + 'px',
+            top: (stop.badgeY * scale) + 'px',
+            backgroundColor: bg,
+            color,
+            borderColor: isSelected ? '#ec4899' : border,
+            zIndex: isSelected ? 32 : 18,
+            transform: isSelected
+              ? 'translate3d(-50%, -50%, 0) scale(1.18)'
+              : 'translate3d(-50%, -50%, 0)'
+          };
+        };
+
+        // 未購入のリストマップピン一覧 (買物中ナビゲーション用：巡回ルート順番を優先)
+        const unboughtListMapPins = computed(() => {
+          const unbought = spaceOrderedListPins.value.filter(p => !p.isCompleted);
+          const orderMap = patrolOrderMap.value;
+          if (Object.keys(orderMap).length > 0) {
+            return [...unbought].sort((a, b) => {
+              const oa = orderMap[a.circle_id] ?? 99999;
+              const ob = orderMap[b.circle_id] ?? 99999;
+              if (oa !== ob) return oa - ob;
+              return 0;
+            });
+          }
+          return unbought;
+        });
+
+        const toggleShoppingMapMode = () => {
+          isShoppingMapMode.value = !isShoppingMapMode.value;
+          if (isShoppingMapMode.value) {
+            showListPins.value = true;
+          }
+        };
+
+        const getListPinStyle = (item) => {
+          const scale = mapScale.value;
+          const isSelected = focusedMapCircle.value && focusedMapCircle.value.circle_id === item.circle_id;
+          const isS = item.priority === 'S' && !item.isCompleted;
+
+          // ★ マップピンのサイズ（1スペース枠 約6px〜8px にジャストフィットし、隣接サークルを覆わない黄金比）
+          let baseSize = 0;
+          if (isShoppingMapMode.value) {
+            baseSize = item.isCompleted 
+              ? Math.max(4.5, Math.round(5 * scale))
+              : isS
+                ? Math.max(8, Math.round(9 * scale))
+                : Math.max(7, Math.round(7.5 * scale));
+          } else {
+            baseSize = item.isCompleted
+              ? Math.max(4, Math.round(4.5 * scale))
+              : isS
+                ? Math.max(7.5, Math.round(8 * scale))  // ★ 1スペース枠に収まるジャスト8px！
+                : item.priority === 'A'
+                  ? Math.max(6.5, Math.round(7 * scale))
+                  : Math.max(6, Math.round(6.5 * scale));
+          }
+          const size = isSelected ? baseSize + 3 : baseSize;
+
+          let bg = '#10b981'; // 🟢 未設定: Emerald Green
+          let ring = '#065f46';
+          let zIndex = 5;
+          let opacity = 1;
+
+          if (item.isCompleted) {
+            bg = '#94a3b8'; // ⚪ 購入済・完売: Slate Gray
+            ring = '#475569';
+            zIndex = 3;
+            opacity = isShoppingMapMode.value ? 0.35 : 0.65;
+          } else if (item.priority === 'S') {
+            bg = '#ef4444'; // 🔴 S: Vivid Red
+            ring = '#991b1b';
+            zIndex = isShoppingMapMode.value ? 25 : 12;
+          } else if (item.priority === 'A') {
+            bg = '#facc15'; // 🟡 A: Vivid Yellow
+            ring = '#854d0e';
+            zIndex = isShoppingMapMode.value ? 24 : 10;
+          } else if (item.priority === 'B') {
+            bg = '#2563eb'; // 🔵 B: Royal Blue
+            ring = '#1e3a8a';
+            zIndex = isShoppingMapMode.value ? 23 : 8;
+          }
+
+          if (isSelected) {
+            zIndex = 30;
+          }
+
+          // ★ 隣接ブース（M-38等）へのはみ出しを防ぎつつ、黒文字上でくっきり浮き立つシャープな枠線・シャドウ
+          let boxShadow = '';
+          if (isShoppingMapMode.value && !item.isCompleted) {
+            boxShadow = isSelected
+              ? `0 0 0 2px #ffffff, 0 0 0 4px #ec4899, 0 0 12px rgba(236,72,153,0.9)`
+              : `0 0 6px ${bg}, 0 1px 3px rgba(0,0,0,0.6)`;
+          } else {
+            boxShadow = isSelected
+              ? `0 0 0 2px #ffffff, 0 0 0 3px #ec4899, 0 1px 3px rgba(0,0,0,0.5)`
+              : `0 1px 3px rgba(0,0,0,0.6)`;
+          }
+
+          return {
+            left: (item.x * scale) + 'px',
+            top: (item.y * scale) + 'px',
+            width: size + 'px',
+            height: size + 'px',
+            backgroundColor: bg,
+            opacity,
+            boxShadow,
+            zIndex
+          };
+        };
+
+        const getFocusedPinBadgeClass = (circleId) => {
+          const saved = savedList.value[circleId];
+          if (!saved) return 'bg-blue-600 text-white';
+          if (saved.bought) return 'bg-emerald-600 text-white';
+          if (saved.soldout) return 'bg-slate-600 text-slate-200 line-through';
+          if (saved.priority === 'S') return 'bg-red-500 text-white';
+          if (saved.priority === 'A') return 'bg-yellow-400 text-slate-950';
+          if (saved.priority === 'B') return 'bg-blue-600 text-white';
+          return 'bg-emerald-500 text-white';
+        };
+
+        // ★ Step 2: マップ上のドット近傍スナップ選択（指でのスクロールと誤タップを厳密に区別）
+        let mapDownPos = { x: 0, y: 0 };
+        const handleMapPointerDown = (e) => {
+          const pt = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
+          mapDownPos = { x: pt.clientX, y: pt.clientY };
+        };
+
+        const focusMapPinItem = (item, shouldScroll = false) => {
+          if (!item) return;
+          focusedMapCircle.value = item.circle;
+          pinX.value = item.x;
+          pinY.value = item.y;
+          targetSpace.value = `${item.spaceLabel} (${item.circle.circle_name})`;
+          savePinPos();
+          if (shouldScroll) {
+            scrollMapToPin(item.x, item.y);
+          }
+        };
+
+        const focusMapCircleById = (circleId) => {
+          const found = activeListMapPins.value.find(p => p.circle_id === circleId);
+          if (found) {
+            focusMapPinItem(found, true);
+          }
+        };
+
+        const handleMapClick = (e) => {
+          if (isDraggingPin) return;
+          const dxMove = Math.abs(e.clientX - mapDownPos.x);
+          const dyMove = Math.abs(e.clientY - mapDownPos.y);
+          if (dxMove > 6 || dyMove > 6) return; // スクロールやドラッグ操作時は無視
+
+          if (!activeListMapPins.value.length) return;
+
+          const container = e.currentTarget;
+          const rect = container.getBoundingClientRect();
+          const mapX = (e.clientX - rect.left) / mapScale.value;
+          const mapY = (e.clientY - rect.top) / mapScale.value;
+
+          // 画面上で半径 18px 以内にあるドットを距離順に取得
+          const maxMapDist = 18 / mapScale.value;
+          const candidates = activeListMapPins.value
+            .map(item => {
+              const dist = Math.hypot(item.x - mapX, item.y - mapY);
+              return { item, dist };
+            })
+            .filter(c => c.dist <= maxMapDist)
+            .sort((a, b) => a.dist - b.dist);
+
+          if (candidates.length === 0) return;
+
+          // 同じ密集箇所を連続タップした場合は、近くにある次の候補へ順番に切り替えられるようにする
+          let chosen = candidates[0].item;
+          if (focusedMapCircle.value && candidates.length > 1) {
+            const currentIdx = candidates.findIndex(c => c.item.circle_id === focusedMapCircle.value.circle_id);
+            if (currentIdx !== -1) {
+              chosen = candidates[(currentIdx + 1) % candidates.length].item;
+            }
+          }
+          focusMapPinItem(chosen, false);
+        };
+
+        const stepMapPin = (dir) => {
+          const list = (showRouteOverlay.value && activePatrolRoute.value.orderedStops.length > 0)
+            ? activePatrolRoute.value.orderedStops
+            : spaceOrderedListPins.value;
+          if (!list.length) return;
+          const currentId = focusedMapCircle.value?.circle_id;
+          const idx = list.findIndex(item => item.circle_id === currentId);
+          const nextIdx = idx === -1 ? 0 : (idx + dir + list.length) % list.length;
+          focusMapPinItem(list[nextIdx], true);
+        };
+
+        const resetAllFilters = () => {
+          searchQuery.value = '';
+          filterBlock.value = '';
+          selectedMembers.value = [];
+          filterItemTag.value = '';
+          filterHasOshinagaki.value = false;
+          filterRecentOnly.value = false;
+          hideAbsent.value = false;
+          searchSortOrder.value = 'space';
+        };
+
+        const scrollMapToPin = (x, y) => {
+          setTimeout(() => {
+            const containers = document.querySelectorAll('.map-container');
+            containers.forEach(container => {
+              if (container.clientWidth > 0) {
+                const scrollX = (x * mapScale.value) - (container.clientWidth / 2);
+                const scrollY = (y * mapScale.value) - (container.clientHeight / 2);
+                container.scrollTo({
+                  left: Math.max(0, scrollX),
+                  top: Math.max(0, scrollY),
+                  behavior: 'smooth'
+                });
+              }
+            });
+          }, 80);
+        };
+
+        const selectBlockAndFocusMap = (block, switchTabOnMobile = true) => {
+          filterBlock.value = filterBlock.value === block ? '' : block;
+          focusedMapCircle.value = null;
+          if (filterBlock.value && switchTabOnMobile && window.innerWidth < 768) {
+            activeTab.value = 'map';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else if (window.innerWidth >= 768 && activeTab.value === 'map') {
+            activeTab.value = 'search';
+          }
+          if (filterBlock.value && mapCoords.value[filterBlock.value]) {
+            const pos = mapCoords.value[filterBlock.value];
+            pinX.value = pos.x;
+            pinY.value = pos.y;
+            targetSpace.value = `ブロック ${filterBlock.value}`;
+            savePinPos();
+            scrollMapToPin(pos.x, pos.y);
+          } else if (!filterBlock.value) {
+            targetSpace.value = null;
+          }
+        };
+
+        const jumpToMap = (circle) => {
+          const spaceId = circle.space_sym + '-' + circle.space_num;
+          targetSpace.value = spaceId + ' (' + circle.circle_name + ')';
+          focusedMapCircle.value = circle;
+          
+          // モバイル表示のときのみマップタブへ切り替え（PCでは左ペインに常時マップがあるため現在のタブを維持）
+          if (window.innerWidth < 768) {
+            activeTab.value = 'map';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          
+          const targetPos = getCircleMapPos(circle);
+          if (targetPos) {
+            pinX.value = targetPos.x;
+            pinY.value = targetPos.y;
+            savePinPos();
+            scrollMapToPin(targetPos.x, targetPos.y);
+          }
+        };
+
+        const sortOrder = ref('route'); // デフォルトを巡回ルート(最短買い回り順)に設定して最適化 
+        const hideBought = ref(false);
+        const searchSortOrder = ref('space'); // 'space' | 'recent'
+        const filterRecentOnly = ref(false);
+        const RECENT_UPDATE_WINDOW_MS = 48 * 60 * 60 * 1000; // 直近48時間
+        
+        // ★ Supabaseから取得した追加情報（タグ・お品書きURL・updated_at）を保持するステート
+        const circleExtraInfo = ref({});
+        
+        // 詳細モーダルのステートと、X(Twitter)埋め込みの監視処理
+        const selectedCircle = ref(null);
+        
+        // ★ 検索クエリに合致した商品名を取得
+        const getMatchedItemNames = (circleId, query) => {
+          const q = (query || '').trim().toLowerCase();
+          if (!q) return [];
+          const items = circleExtraInfo.value[circleId]?.items || [];
+          return items
+            .filter(it => it.name && it.name.toLowerCase().includes(q))
+            .map(it => it.name);
+        };
+
+        // ★ イベント日時 & カウントダウン
+        const currentTime = ref(new Date());
+        setInterval(() => {
+          currentTime.value = new Date();
+        }, 60000);
+
+        // ★ 直近48時間以内にお品書きURLまたは頒布物が登録・更新されたか判定
+        const isRecentOshinagakiUpdate = (circleId) => {
+          const extra = circleExtraInfo.value[circleId];
+          if (!extra || !extra.updated_at) return false;
+          const hasOshinagakiOrItems = Boolean((extra.oshinagaki_url || '').trim()) || (Array.isArray(extra.items) && extra.items.length > 0);
+          if (!hasOshinagakiOrItems) return false;
+          const updatedMs = Date.parse(extra.updated_at);
+          if (isNaN(updatedMs)) return false;
+          const diffMs = currentTime.value.getTime() - updatedMs;
+          return diffMs >= -60000 && diffMs <= RECENT_UPDATE_WINDOW_MS;
+        };
+
+        const getRelativeUpdateLabel = (circleId) => {
+          const extra = circleExtraInfo.value[circleId];
+          if (!extra || !extra.updated_at) return '';
+          const updatedMs = Date.parse(extra.updated_at);
+          if (isNaN(updatedMs)) return '';
+          const diffMs = Math.max(0, currentTime.value.getTime() - updatedMs);
+          const diffMin = Math.floor(diffMs / 60000);
+          if (diffMin < 60) return `${Math.max(1, diffMin)}分前に更新`;
+          const diffHours = Math.floor(diffMin / 60);
+          if (diffHours < 24) return `${diffHours}時間前に更新`;
+          const diffDays = Math.floor(diffHours / 24);
+          return `${diffDays}日前に更新`;
+        };
+
+        const recentOshinagakiCount = computed(() => {
+          return circles.value.filter(c => isRecentOshinagakiUpdate(c.circle_id)).length;
+        });
+
+        const eventCountdown = computed(() => getEventCountdown(currentTime.value));
+        const isCurrentSchedule = (timeKey) => checkScheduleActive(timeKey, currentTime.value);
+
+        // ★ 両替・金種計算 (買い物リストから自動逆算)
+        const currencyBreakdown = computed(() => calculateCurrencyBreakdown(savedList.value));
+
+        // ★ ログアウト確認付きハンドラ
+        const handleSafeSignOut = async () => {
+          if (confirm('ログアウトしてもよろしいですか？\n※会場など電波が弱い環境では再ログインに時間がかかる場合があります。')) {
+            await supabaseClient.auth.signOut();
+            user.value = null;
+            location.reload();
+          }
+        };
+
+        const getCircleTotalItemCount = (circleId) => {
+          const saved = savedList.value[circleId];
+          if (!saved || !saved.selectedItems) return 0;
+          const qMap = saved.itemQuantities || {};
+          return saved.selectedItems.reduce((acc, name) => acc + (qMap[name] || 1), 0);
+        };
+
+        const toggleItemSelection = (circleId, item) => {
+          if (isReadOnly.value) return;
+          
+          if (!savedList.value[circleId]) {
+            savedList.value[circleId] = {
+              memo: '',
+              bought: false,
+              soldout: false,
+              price: '',
+              priority: '',
+              forWho: '',
+              selectedItems: [],
+              itemQuantities: {}
+            };
+          }
+          const saved = savedList.value[circleId];
+          if (!saved.selectedItems) saved.selectedItems = [];
+          if (!saved.itemQuantities) saved.itemQuantities = {};
+
+          const idx = saved.selectedItems.indexOf(item.name);
+          if (idx > -1) {
+            saved.selectedItems.splice(idx, 1);
+            delete saved.itemQuantities[item.name];
+          } else {
+            saved.selectedItems.push(item.name);
+            saved.itemQuantities[item.name] = 1;
+          }
+
+          // 金額の自動再計算 (単価 × 個数)
+          const items = circleExtraInfo.value[circleId]?.items || [];
+          const total = items
+            .filter(it => saved.selectedItems.includes(it.name))
+            .reduce((sum, it) => {
+              const q = saved.itemQuantities[it.name] || 1;
+              return sum + (Number(it.price) || 0) * q;
+            }, 0);
+          
+          saved.price = total > 0 ? total : '';
+        };
+
+        const changeItemQuantity = (circleId, item, delta) => {
+          if (isReadOnly.value) return;
+
+          if (!savedList.value[circleId]) {
+            savedList.value[circleId] = {
+              memo: '',
+              bought: false,
+              soldout: false,
+              price: '',
+              priority: '',
+              forWho: '',
+              selectedItems: [],
+              itemQuantities: {}
+            };
+          }
+          const saved = savedList.value[circleId];
+          if (!saved.selectedItems) saved.selectedItems = [];
+          if (!saved.itemQuantities) saved.itemQuantities = {};
+
+          const currentQty = saved.itemQuantities[item.name] || (saved.selectedItems.includes(item.name) ? 1 : 0);
+          const newQty = Math.max(0, currentQty + delta);
+
+          if (newQty === 0) {
+            const idx = saved.selectedItems.indexOf(item.name);
+            if (idx > -1) saved.selectedItems.splice(idx, 1);
+            delete saved.itemQuantities[item.name];
+          } else {
+            if (!saved.selectedItems.includes(item.name)) {
+              saved.selectedItems.push(item.name);
+            }
+            saved.itemQuantities[item.name] = newQty;
+          }
+
+          // 金額の自動再計算 (単価 × 個数)
+          const items = circleExtraInfo.value[circleId]?.items || [];
+          const total = items
+            .filter(it => saved.selectedItems.includes(it.name))
+            .reduce((sum, it) => {
+              const q = saved.itemQuantities[it.name] || 1;
+              return sum + (Number(it.price) || 0) * q;
+            }, 0);
+
+          saved.price = total > 0 ? total : '';
+        };
+
+        const openDetails = (circle) => {
+          selectedCircle.value = circle;
+        };
+
+        watch(selectedCircle, async (newVal) => {
+          if (newVal && circleExtraInfo.value[newVal.circle_id]?.oshinagaki_url) {
+            const raw = circleExtraInfo.value[newVal.circle_id].oshinagaki_url;
+            const urls = parseOshinagakiUrls(raw);
+            const xItems = urls.map((u, i) => ({ url: u, index: i, parsed: parseOshinagakiUrlType(u) }))
+                               .filter(item => item.parsed.type === 'x' && item.parsed.id);
+
+            // Xポストが1つもない場合（すべてPixivまたは外部リンク）
+            if (xItems.length === 0) {
+              isTweetLoading.value = false;
+              return;
+            }
+
+            isTweetLoading.value = true;
+            await nextTick();
+
+            if (window.twttr && window.twttr.widgets && window.twttr.widgets.createTweet) {
+              const renderPromises = xItems.map(async ({ parsed, index }) => {
+                const tweetId = parsed.id;
+                const container = document.getElementById(`tweet-container-${index}`) || document.getElementById('tweet-container');
+                if (container) {
+                  container.innerHTML = '';
+                  try {
+                    await window.twttr.widgets.createTweet(tweetId, container, {
+                      align: 'center',
+                      conversation: 'all',
+                      dnt: true
+                    });
+                  } catch (e) {
+                    console.error('Tweet widget render error:', e);
+                  }
+                }
+              });
+
+              await Promise.allSettled(renderPromises);
+              isTweetLoading.value = false;
+            } else {
+              isTweetLoading.value = false;
+            }
+          } else {
+            isTweetLoading.value = false;
+          }
+        });
+        
+        const mapScale = ref(1.0);
+        const pinX = ref(617);
+        const pinY = ref(84);
+        let isDraggingPin = false;
+
+        const shareUrl = computed(() => {
+          if (!listId.value) return '';
+          const url = new URL(window.location.href);
+          url.searchParams.set('list', listId.value);
+          return url.toString();
+        });
+
+        const syncFreeMemoFromState = () => {
+          if (savedList.value['__FREE_MEMO__']) freeMemoText.value = savedList.value['__FREE_MEMO__'].text || '';
+          if (savedList.value['__TIMELINE__'] && Array.isArray(savedList.value['__TIMELINE__'])) {
+            timelineEvents.value = savedList.value['__TIMELINE__'];
+          } else {
+            timelineEvents.value = [];
+          }
+          if (savedList.value['__PIN_POS__']) {
+            const sx = savedList.value['__PIN_POS__'].x;
+            const sy = savedList.value['__PIN_POS__'].y;
+            if (sx && sy && !(sx === 100 && sy === 100)) {
+              pinX.value = sx;
+              pinY.value = sy;
+            }
+          }
+        };
+
+        const openAddTimelineForCircle = (circle) => {
+          if (!circle) return;
+          activeTab.value = 'memo';
+          nextTick(() => {
+            const space = `${circle.space_sym}-${circle.space_num}`;
+            memoDashboardRef.value?.openAddTimelineModal({
+              circleId: circle.circle_id,
+              circleName: circle.circle_name,
+              space: space,
+              location: space,
+              title: `【${space}】${circle.circle_name}`,
+              category: 'circle'
+            });
+          });
+        };
+
+        // リストデータが空かどうかを判定（初期メタデータのみの空オブジェクトも「空」とみなす）
+        const isListDataEmpty = (listObj) => {
+          if (!listObj || typeof listObj !== 'object') return true;
+          for (const [key, val] of Object.entries(listObj)) {
+            if (key === '__FREE_MEMO__') {
+              if (val && typeof val.text === 'string' && val.text.trim().length > 0) return false;
+            } else if (key === '__TIMELINE__') {
+              if (Array.isArray(val) && val.length > 0) return false;
+            } else if (key === '__BUDGET__') {
+              if (Number(val) > 0) return false;
+            } else if (key === '__PIN_POS__') {
+              continue;
+            } else if (!key.startsWith('__') && val && typeof val === 'object') {
+              return false;
+            }
+          }
+          return true;
+        };
+
+        const getLocalStoredList = () => {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          let localData = {};
+          if (stored) {
+            try { localData = JSON.parse(stored) || {}; } catch (e) { localData = {}; }
+          }
+          if (isListDataEmpty(localData) && !isListDataEmpty(savedList.value)) {
+            return savedList.value;
+          }
+          return localData;
+        };
+
+        const saveToCloud = async (newVal) => {
+          if (!user.value || !isOnline.value || isReadOnly.value) return; 
+          clearTimeout(saveTimeout); isSaving.value = true;
+          saveTimeout = setTimeout(async () => {
+            try {
+              const payload = {
+                user_id: user.value.id,
+                list_data: newVal,
+                updated_at: new Date().toISOString()
+              };
+              const upsertPromise = supabaseClient
+                .from('shopping_lists')
+                .upsert(payload, { onConflict: 'user_id' })
+                .select('id, is_public')
+                .maybeSingle();
+              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ error: 'TIMEOUT', data: null }), 3500));
+              const { data, error } = await Promise.race([upsertPromise, timeoutPromise]);
+
+              if (!error && data) {
+                if (data.id) listId.value = data.id;
+              } else if (error && error !== 'TIMEOUT') {
+                // 万一 shopping_lists.user_id に UNIQUE 制約が未適用の環境 (42P10) の場合は update -> 0行なら insert にフォールバック
+                if (error.code === '42P10') {
+                  const { data: updatedRows } = await supabaseClient
+                    .from('shopping_lists')
+                    .update({ list_data: newVal, updated_at: payload.updated_at })
+                    .eq('user_id', user.value.id)
+                    .select('id');
+                  if (!updatedRows || updatedRows.length === 0) {
+                    const { data: inserted } = await supabaseClient
+                      .from('shopping_lists')
+                      .insert(payload)
+                      .select('id')
+                      .maybeSingle();
+                    if (inserted?.id) listId.value = inserted.id;
+                  } else if (updatedRows[0]?.id) {
+                    listId.value = updatedRows[0].id;
+                  }
+                } else {
+                  console.warn('shopping_lists save warning:', error);
+                }
+              }
+            } catch (err) {
+              console.warn('Cloud save deferred (offline/weak signal):', err);
+            } finally {
+              isSaving.value = false;
+            }
+          }, 1500); 
+        };
+
+        // デフォルト初期アナウンス (Supabase未接続時やオフライン時の安全フォールバック)
+        const DEFAULT_NOTIFICATIONS = [
+          {
+            id: 'default_welcome_vggc12th',
+            created_at: '2026-10-29T12:00:00Z',
+            title: 'VGGC 12th お買い物支援ツール 大型アップデート公開！',
+            body: '当日タイムスケジュール、お品書き拡大ピンチズーム、ぶいすぽ推し複数選択、完全オフライン耐障害性強化など新機能が多数追加されました！',
+            type: 'feature',
+            category: 'announcement',
+            is_pinned: true,
+            link_url: null
+          },
+          {
+            id: 'default_official_schedule',
+            created_at: '2026-10-29T11:00:00Z',
+            title: '【公式】11/14(土) 当日スケジュール案内',
+            body: '09:45 受付開始\n10:00 サークル入場/更衣室開場\n12:00 即売会開会（一般入場）\n15:30 即売会終了\n15:45 アフターイベント',
+            type: 'official',
+            category: 'official',
+            is_pinned: false,
+            link_url: null
+          }
+        ];
+
+        // Supabaseから通知を取得 (2.5秒タイムアウト保護付き)
+        const fetchNotifications = async () => {
+          // まずローカルキャッシュから即時復元 (0ms)
+          try {
+            const cached = localStorage.getItem('vggc_cached_notifications');
+            if (cached) {
+              notifications.value = JSON.parse(cached);
+            } else {
+              notifications.value = [...DEFAULT_NOTIFICATIONS];
+            }
+          } catch (e) {
+            notifications.value = [...DEFAULT_NOTIFICATIONS];
+          }
+
+          if (!isOnline.value) return;
+
+          try {
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Notifications timeout')), 2500)
+            );
+            const fetchPromise = supabaseClient
+              .from('notifications')
+              .select('*')
+              .order('is_pinned', { ascending: false })
+              .order('created_at', { ascending: false });
+
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+            if (!error && data && data.length > 0) {
+              // タイムラインのローカル通知とクラウド通知をマージ
+              const timelineNotifs = notifications.value.filter(n => n.category === 'timeline');
+              const merged = [...timelineNotifs];
+              data.forEach(cloudItem => {
+                if (!merged.some(m => m.id === cloudItem.id)) {
+                  merged.push(cloudItem);
+                }
+              });
+              notifications.value = merged;
+              localStorage.setItem('vggc_cached_notifications', JSON.stringify(merged));
+            }
+          } catch (e) {
+            console.warn('Notifications fetch skipped or timed out:', e);
+          }
+        };
+
+        // タイムライン当日リマインダーをチェック
+        const checkTimelineNotifications = (simulatedDate = null) => {
+          const events = timelineEvents.value || [];
+          const newNotifs = checkUpcomingTimelineReminders(events, circles.value, simulatedDate);
+          if (newNotifs && newNotifs.length > 0) {
+            const currentIds = notifications.value.map(n => n.id);
+            const toAdd = newNotifs.filter(n => !currentIds.includes(n.id));
+            if (toAdd.length > 0) {
+              notifications.value = [...toAdd, ...notifications.value];
+              localStorage.setItem('vggc_cached_notifications', JSON.stringify(notifications.value));
+            }
+          }
+        };
+
+        // 既読処理
+        const markNotificationAsRead = (id) => {
+          if (!readNotificationIds.value.includes(id)) {
+            readNotificationIds.value.push(id);
+            localStorage.setItem('vggc_read_notifications', JSON.stringify(readNotificationIds.value));
+          }
+        };
+
+        const markAllNotificationsAsRead = () => {
+          const allIds = notifications.value.map(n => n.id);
+          readNotificationIds.value = Array.from(new Set([...readNotificationIds.value, ...allIds]));
+          localStorage.setItem('vggc_read_notifications', JSON.stringify(readNotificationIds.value));
+        };
+
+        // 通知クリック時のアクション処理
+        const handleNotificationAction = (action) => {
+          if (!action) return;
+          if (action.type === 'open_circle' && action.circleId) {
+            const target = circles.value.find(c => c.circle_id === action.circleId);
+            if (target) {
+              selectedCircle.value = target;
+            }
+          } else if (action.type === 'jump_to_timeline') {
+            activeTab.value = 'memo';
+          }
+        };
+
+        // タイムライン通知テスト実行 (ユーザーがデモ動作を確認可能)
+        const triggerTimelineTest = () => {
+          const testNotif = generateTestTimelineNotification(timelineEvents.value, circles.value);
+          if (testNotif) {
+            // 未読として先頭に追加
+            notifications.value = [testNotif, ...notifications.value];
+            localStorage.setItem('vggc_cached_notifications', JSON.stringify(notifications.value));
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification(testNotif.title, {
+                body: testNotif.body,
+                icon: '/icons/icon-192.png'
+              });
+            }
+          }
+        };
+
+        onMounted(async () => {
+          // キーボードショートカット ('/' で検索フォーカス、'Escape' でモーダルを閉じる)
+          window.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            const isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
+            if (e.key === '/' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              activeTab.value = 'search';
+              nextTick(() => {
+                searchInputRef.value?.focus();
+              });
+            } else if (e.key === 'Escape') {
+              if (selectedCircle.value) selectedCircle.value = null;
+              else if (showNotificationModal.value) showNotificationModal.value = false;
+              else if (showHelpModal.value) showHelpModal.value = false;
+              else if (showBudgetModal.value) showBudgetModal.value = false;
+              else if (showAuthModal.value) showAuthModal.value = false;
+              else if (showShareModal.value) showShareModal.value = false;
+            }
+          });
+
+          // PC画面へリサイズされた際に activeTab が 'map' のままだと右ペインが空になるのを防ぐ
+          window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768 && activeTab.value === 'map') {
+              activeTab.value = 'search';
+            }
+          });
+
+          // ★ オフライン対策: キャッシュから即時データを復元 (SWR)
+          try {
+            const cachedData = localStorage.getItem('vggc12th_data_cache');
+            if (cachedData) {
+              const parsed = JSON.parse(cachedData);
+              if (parsed.circles && parsed.circles.length) circles.value = parsed.circles;
+              if (parsed.blocks && parsed.blocks.length) blocks.value = parsed.blocks;
+            }
+            const cachedExtra = localStorage.getItem('vggc12th_circle_info_cache');
+            if (cachedExtra) {
+              circleExtraInfo.value = JSON.parse(cachedExtra);
+            }
+          } catch (e) {
+            console.warn('Cache restore skipped:', e);
+          }
+          window.addEventListener('online', () => {
+            isOnline.value = true;
+            if (user.value && !isReadOnly.value) saveToCloud(savedList.value);
+          });
+          window.addEventListener('offline', () => {
+            isOnline.value = false;
+          });
+
+          if (!localStorage.getItem('vggc_help_shown')) {
+            showHelpModal.value = true;
+            localStorage.setItem('vggc_help_shown', 'true');
+          }
+
+          const urlParams = new URLSearchParams(window.location.search);
+          const sharedListId = urlParams.get('list');
+          
+          if (sharedListId) {
+            isReadOnly.value = true;
+            activeTab.value = 'list';
+            await loadSharedList(sharedListId);
+          } else {
+            // ★ Local-First: まずローカルストレージから即座に復元 (0ms・オフラインでも即時表示)
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+              try { savedList.value = JSON.parse(stored); syncFreeMemoFromState(); } catch (e) {}
+            }
+
+            try {
+              const { data: { session } } = await supabaseClient.auth.getSession();
+              user.value = session?.user || null;
+              if (user.value && isOnline.value) {
+                // バックグラウンドでクラウドリストと同期 (タイムアウト保護付き)
+                loadCloudList(user.value.id);
+              }
+            } catch (e) {
+              console.warn('Auth session check skipped:', e);
+            }
+          }
+
+          supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            const currentUser = session?.user || null;
+            user.value = currentUser;
+            if (currentUser && !isReadOnly.value && isOnline.value) loadCloudList(currentUser.id);
+          });
+
+          // ★ データの独立読み込み＆耐障害性向上 (data.json と Supabase を分離)
+          // 1. 静的データ (/data.json) を最優先でロード (Service Workerプリキャッシュから一瞬で返却)
+          try {
+            const localRes = await fetch('/data.json');
+            if (localRes && localRes.ok) {
+              const data = await localRes.json();
+              circles.value = data.circles;
+              blocks.value = data.sort_order;
+              try {
+                localStorage.setItem('vggc12th_data_cache', JSON.stringify({
+                  circles: data.circles,
+                  blocks: data.sort_order
+                }));
+              } catch (e) {}
+            }
+          } catch (err) {
+            console.warn('Local data.json fetch error, using SWR cache:', err);
+          } finally {
+            // サークルデータが手元に入った時点でローディングスピナーを解除（白画面ブロックを根絶）
+            loading.value = false;
+          }
+
+          // 2. Supabaseからの追加情報 (お品書き・タグ・欠席情報) を2.5秒タイムアウト保護付きで非同期取得
+          if (isOnline.value) {
+            try {
+              const fetchPromise = supabaseClient.from('circle_info').select('*');
+              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ error: 'TIMEOUT', data: null }), 2500));
+              const supabaseRes = await Promise.race([fetchPromise, timeoutPromise]);
+              
+              if (supabaseRes && !supabaseRes.error && supabaseRes.data) {
+                const infoMap = {};
+                supabaseRes.data.forEach(info => {
+                  const rawTags = Array.isArray(info.tags) ? info.tags : [];
+                  const isAbsent = Boolean(info.is_absent) || rawTags.includes('__ABSENT__') || rawTags.includes('不参加') || rawTags.includes('欠席');
+                  const cleanTags = rawTags.filter(t => !String(t).startsWith('__'));
+                  infoMap[info.circle_id] = {
+                    tags: cleanTags,
+                    members: info.members || [],
+                    oshinagaki_url: info.oshinagaki_url || '',
+                    items: Array.isArray(info.items) ? info.items : [],
+                    twitter_id: info.twitter_id || '',
+                    staff_twitter: info.staff_twitter || '',
+                    is_absent: isAbsent,
+                    updated_at: info.updated_at || null
+                  };
+                });
+                circleExtraInfo.value = infoMap;
+                try {
+                  localStorage.setItem('vggc12th_circle_info_cache', JSON.stringify(infoMap));
+                } catch (e) {}
+              }
+
+              // Supabase Realtime (電波安定時のみ安全に購読)
+              supabaseClient
+                .channel('public:circle_info')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_info' }, (payload) => {
+                  if (payload.new && payload.new.circle_id) {
+                    const rawTags = Array.isArray(payload.new.tags) ? payload.new.tags : [];
+                    const isAbsent = Boolean(payload.new.is_absent) || rawTags.includes('__ABSENT__') || rawTags.includes('不参加') || rawTags.includes('欠席');
+                    const cleanTags = rawTags.filter(t => !String(t).startsWith('__'));
+                    circleExtraInfo.value[payload.new.circle_id] = {
+                      tags: cleanTags,
+                      members: payload.new.members || [],
+                      oshinagaki_url: payload.new.oshinagaki_url || '',
+                      items: Array.isArray(payload.new.items) ? payload.new.items : [],
+                      twitter_id: payload.new.twitter_id || '',
+                      staff_twitter: payload.new.staff_twitter || '',
+                      is_absent: isAbsent,
+                      updated_at: payload.new.updated_at || null
+                    };
+                    try {
+                      localStorage.setItem('vggc12th_circle_info_cache', JSON.stringify(circleExtraInfo.value));
+                    } catch (e) {}
+                  }
+                })
+                .subscribe();
+            } catch (error) { 
+              console.warn('Supabase circle_info network error (offline fallback applied):', error); 
+            }
+          }
+
+          // ★ お知らせ・タイムライン通知の初期ロード ＆ 30秒定期監視
+          fetchNotifications();
+          checkTimelineNotifications();
+          setInterval(() => {
+            checkTimelineNotifications();
+          }, 30000);
+
+          // ★ 買い物リストのスクロール連動型自動スリムヘッダー
+          window.addEventListener('scroll', handleListScroll, { passive: true });
+        });
+
+        onUnmounted(() => {
+          window.removeEventListener('scroll', handleListScroll);
+        });
+
+        const isCircleAbsent = (circleId) => {
+          const extra = circleExtraInfo.value[circleId];
+          if (!extra) return false;
+          return Boolean(extra.is_absent) || (extra.tags || []).includes('__ABSENT__') || (extra.tags || []).includes('不参加') || (extra.tags || []).includes('欠席');
+        };
+
+        const absentCirclesCount = computed(() => {
+          return circles.value.filter(c => isCircleAbsent(c.circle_id)).length;
+        });
+
+        const loadSharedList = async (id) => {
+          const { data } = await supabaseClient.from('shopping_lists').select('list_data, is_public').eq('id', id).single();
+          if (data && data.is_public) {
+            savedList.value = data.list_data || {}; syncFreeMemoFromState();
+          } else {
+            alert('共有リストが見つからないか非公開です。'); exitReadOnly();
+          }
+        };
+
+        let isCloudListLoading = false;
+        const loadCloudList = async (userId) => {
+          if (!userId || isCloudListLoading) return;
+          isCloudListLoading = true;
+          try {
+            const fetchPromise = supabaseClient.from('shopping_lists').select('*').eq('user_id', userId).single();
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ error: 'TIMEOUT', data: null }), 2500));
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+            if (error === 'TIMEOUT') {
+              return;
+            }
+
+            const localData = getLocalStoredList();
+            const localHasData = !isListDataEmpty(localData);
+
+            if (data && !error) {
+              const cloudData = data.list_data || {};
+              const cloudIsEmpty = isListDataEmpty(cloudData);
+
+              // 初回同期時のデータ消失防止: クラウドが空({})でローカルにリストがある場合はローカルを採用してクラウドへ保存
+              if (cloudIsEmpty && localHasData) {
+                savedList.value = localData;
+                isPublic.value = Boolean(data.is_public);
+                listId.value = data.id;
+                syncFreeMemoFromState();
+                const nowIso = new Date().toISOString();
+                const { data: upserted, error: upsertErr } = await supabaseClient
+                  .from('shopping_lists')
+                  .upsert({ user_id: userId, list_data: localData, updated_at: nowIso }, { onConflict: 'user_id' })
+                  .select()
+                  .maybeSingle();
+                if (!upsertErr && upserted) {
+                  listId.value = upserted.id;
+                } else if (upsertErr && upsertErr.code === '42P10') {
+                  await supabaseClient
+                    .from('shopping_lists')
+                    .update({ list_data: localData, updated_at: nowIso })
+                    .eq('user_id', userId);
+                }
+              } else {
+                savedList.value = cloudData;
+                isPublic.value = Boolean(data.is_public);
+                listId.value = data.id;
+                syncFreeMemoFromState();
+              }
+            } else if (!error || error.code === 'PGRST116') {
+              // 行が存在しない場合（.single() の 0行エラー PGRST116）はローカルの内容を初期値として新規行を作成
+              const initialData = localHasData ? localData : (savedList.value || {});
+              const nowIso = new Date().toISOString();
+              const { data: newData, error: upsertErr } = await supabaseClient
+                .from('shopping_lists')
+                .upsert({ user_id: userId, list_data: initialData, updated_at: nowIso }, { onConflict: 'user_id' })
+                .select()
+                .maybeSingle();
+              if (!upsertErr && newData) {
+                savedList.value = newData.list_data || initialData;
+                isPublic.value = Boolean(newData.is_public);
+                listId.value = newData.id;
+                syncFreeMemoFromState();
+              } else {
+                // UNIQUE 制約未適用環境 (42P10) 等のフォールバックとして insert を実行
+                const { data: insertedData } = await supabaseClient
+                  .from('shopping_lists')
+                  .insert({ user_id: userId, list_data: initialData })
+                  .select()
+                  .single();
+                if (insertedData) {
+                  savedList.value = insertedData.list_data || initialData;
+                  isPublic.value = Boolean(insertedData.is_public);
+                  listId.value = insertedData.id;
+                  syncFreeMemoFromState();
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('loadCloudList network error, maintaining local list:', e);
+          } finally {
+            isCloudListLoading = false;
+          }
+        };
+
+        let saveTimeout = null;
+        watch(savedList, (newVal) => {
+          if (isReadOnly.value) return; 
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+          saveToCloud(newVal);
+        }, { deep: true });
+
+        watch(freeMemoText, (newText) => {
+          if (isReadOnly.value) return;
+          if (!savedList.value['__FREE_MEMO__']) savedList.value['__FREE_MEMO__'] = {};
+          savedList.value['__FREE_MEMO__'].text = newText;
+        });
+
+        watch(timelineEvents, (newList) => {
+          if (isReadOnly.value) return;
+          savedList.value['__TIMELINE__'] = newList;
+        }, { deep: true });
+
+        const savePinPos = () => {
+          if (isReadOnly.value) return;
+          if (!savedList.value['__PIN_POS__']) savedList.value['__PIN_POS__'] = {};
+          savedList.value['__PIN_POS__'].x = pinX.value;
+          savedList.value['__PIN_POS__'].y = pinY.value;
+        };
+
+        const toggleSave = (circleId) => {
+          if (isReadOnly.value) return;
+          if (savedList.value[circleId]) {
+            delete savedList.value[circleId];
+          } else {
+            savedList.value[circleId] = { memo: '', bought: false, soldout: false, price: '', priority: '', forWho: '', selectedItems: [], itemQuantities: {} };
+          }
+        };
+
+        const toggleBought = (circleId) => {
+          if (isReadOnly.value || !savedList.value[circleId]) return;
+          savedList.value[circleId].bought = !savedList.value[circleId].bought;
+          if (savedList.value[circleId].bought) {
+            savedList.value[circleId].soldout = false;
+          }
+        };
+
+        const toggleSoldout = (circleId) => {
+          if (isReadOnly.value || !savedList.value[circleId]) return;
+          savedList.value[circleId].soldout = !savedList.value[circleId].soldout;
+          if (savedList.value[circleId].soldout) {
+            savedList.value[circleId].bought = false;
+          }
+        };
+
+        const toggleBlock = (block) => { filterBlock.value = filterBlock.value === block ? '' : block; activeTab.value = 'search'; };
+        
+        const startDrag = () => { if(!isReadOnly.value) isDraggingPin = true; };
+        const stopDrag = () => { if(isDraggingPin){ isDraggingPin = false; savePinPos(); } };
+        const dragPin = (e) => {
+          if (!isDraggingPin) return;
+          e.preventDefault();
+          const container = e.currentTarget; 
+          const rect = container.getBoundingClientRect();
+          let clientX, clientY;
+          if (e.touches && e.touches.length > 0) {
+             clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
+          } else {
+             clientX = e.clientX; clientY = e.clientY;
+          }
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+          pinX.value = Math.max(0, Math.min(x, container.offsetWidth)) / mapScale.value;
+          pinY.value = Math.max(0, Math.min(y, container.offsetHeight)) / mapScale.value;
+        };
+
+        const shareToTwitter = () => {
+          let text = "🛒 ぶいごまVGGC12th 買い出しリスト\n\n";
+          text += `予算: ¥${totalPrice.value.toLocaleString()}\n`;
+          if (spentPrice.value > 0) text += `購入済: ¥${spentPrice.value.toLocaleString()}\n`;
+          if (soldoutSavings.value > 0) text += `完売浮き: ¥${soldoutSavings.value.toLocaleString()}\n`;
+          text += `(全${savedCount.value}サークル中、${boughtCount.value}サークル購入済${soldoutCount.value > 0 ? ` / 完売: ${soldoutCount.value}` : ''})\n\n`;
+          text += "#VGGC12th\n";
+          if (listId.value && isPublic.value) {
+            text += `\n${shareUrl.value}`;
+          }
+          const encoded = encodeURIComponent(text);
+          window.open(`https://twitter.com/intent/tweet?text=${encoded}`, '_blank');
+        };
+
+        const exportToText = () => {
+          let text = "📝 買い物リスト (VGGC 12th)\n";
+          text += `合計予定額: ¥${totalPrice.value.toLocaleString()}`;
+          if (soldoutSavings.value > 0) {
+            text += ` (完売浮き: ¥${soldoutSavings.value.toLocaleString()})`;
+          }
+          text += "\n\n";
+          sortedSavedCircles.value.forEach(c => {
+            const data = savedList.value[c.circle_id];
+            let status = '[未]';
+            if (isCircleAbsent(c.circle_id)) status = '[不参加]';
+            else if (data.soldout) status = '[完売]';
+            else if (data.bought) status = '[済]';
+            const prio = data.priority ? `(${data.priority})` : '';
+            const price = data.price ? ` ¥${data.price}` : '';
+            const who = data.forWho ? ` @${data.forWho}` : '';
+            text += `${status} ${c.space_sym}-${c.space_num} ${c.circle_name} ${prio}${price}${who}\n`;
+            if (data.selectedItems && data.selectedItems.length > 0) {
+              const itemDetails = data.selectedItems.map(name => {
+                const q = data.itemQuantities?.[name] || 1;
+                return q > 1 ? `${name} ×${q}` : name;
+              });
+              text += `  品名: ${itemDetails.join(', ')}\n`;
+            }
+            if (data.memo) text += `  メモ: ${data.memo}\n`;
+          });
+          navigator.clipboard.writeText(text).then(() => alert("クリップボードにコピーしました！X(Twitter)やメモ帳に貼り付けられます。"));
+        };
+
+        
+        const showBudgetModal = ref(false);
+
+        const budgetAmount = computed(() => {
+          return savedList.value['__BUDGET__'] ? parseInt(savedList.value['__BUDGET__']) || 0 : 0;
+        });
+
+        const remainingBudget = computed(() => {
+          return budgetAmount.value - spentPrice.value;
+        });
+
+        // ★ 予算オーバー判定 & 超過金額
+        const isOverBudget = computed(() => {
+          return budgetAmount.value > 0 && totalPrice.value > budgetAmount.value;
+        });
+
+        const overBudgetAmount = computed(() => {
+          return Math.max(0, totalPrice.value - budgetAmount.value);
+        });
+
+        const isSpentOverBudget = computed(() => {
+          return budgetAmount.value > 0 && spentPrice.value > budgetAmount.value;
+        });
+
+        const overSpentAmount = computed(() => {
+          return Math.max(0, spentPrice.value - budgetAmount.value);
+        });
+
+        const isShoppingMapMode = ref(false);
+
+        const openBudgetModal = () => {
+          if (isReadOnly.value) return;
+          showBudgetModal.value = true;
+        };
+
+        const saveBudget = (amount) => {
+          if (isReadOnly.value) return;
+          const parsed = parseInt(amount);
+          savedList.value['__BUDGET__'] = isNaN(parsed) ? 0 : parsed;
+          showBudgetModal.value = false;
+        };
+
+        // ★ 購入予定総額（完売・スキップしたサークルは自動除外され、浮いた予算を再計算）
+        const totalPrice = computed(() => {
+          let total = 0;
+          Object.keys(savedList.value).forEach(key => {
+             if (key.startsWith('__')) return;
+             if (savedList.value[key].soldout) return; // 完売分は予定総額から除外
+             const price = parseInt(savedList.value[key].price);
+             if (!isNaN(price)) total += price;
+          });
+          return total;
+        });
+
+        // ★ 完売・スキップによって浮いた予算額
+        const soldoutSavings = computed(() => {
+          let total = 0;
+          Object.keys(savedList.value).forEach(key => {
+             if (key.startsWith('__')) return;
+             if (savedList.value[key].soldout) {
+               const price = parseInt(savedList.value[key].price);
+               if (!isNaN(price)) total += price;
+             }
+          });
+          return total;
+        });
+
+        const spentPrice = computed(() => {
+          let total = 0;
+          Object.keys(savedList.value).forEach(key => {
+             if (key.startsWith('__')) return;
+             if (savedList.value[key].bought) {
+               const price = parseInt(savedList.value[key].price);
+               if (!isNaN(price)) total += price;
+             }
+          });
+          return total;
+        });
+
+        const savedCount = computed(() => Object.keys(savedList.value).filter(k => !k.startsWith('__')).length);
+        
+        const soldoutCount = computed(() => {
+          return Object.keys(savedList.value).filter(k => !k.startsWith('__') && savedList.value[k].soldout).length;
+        });
+
+        const boughtCount = computed(() => {
+          return Object.keys(savedList.value).filter(k => !k.startsWith('__') && savedList.value[k].bought).length;
+        });
+
+        const activeTargetCount = computed(() => {
+          return Math.max(0, savedCount.value - soldoutCount.value);
+        });
+
+        const progressPercent = computed(() => {
+          if (activeTargetCount.value === 0) return 0;
+          return Math.min(100, Math.round((boughtCount.value / activeTargetCount.value) * 100));
+        });
+        
+        // ★ ブロックごとの周回状況・予定額の統計集計（買い物リスト用）
+        const savedBlockStats = computed(() => {
+          const stats = {};
+          circles.value.forEach(circle => {
+            const saved = savedList.value[circle.circle_id];
+            if (!saved) return;
+            const b = circle.space_sym || '他';
+            if (!stats[b]) {
+              stats[b] = {
+                totalCount: 0,
+                boughtCount: 0,
+                soldoutCount: 0,
+                remainingCount: 0,
+                remainingPrice: 0,
+                spentPrice: 0,
+              };
+            }
+            stats[b].totalCount++;
+            const price = parseInt(saved.price) || 0;
+            if (saved.bought) {
+              stats[b].boughtCount++;
+              stats[b].spentPrice += price;
+            } else if (saved.soldout) {
+              stats[b].soldoutCount++;
+            } else {
+              stats[b].remainingCount++;
+              stats[b].remainingPrice += price;
+            }
+          });
+          return stats;
+        });
+
+        // ★ 配置順・巡回ルートソート時のブロック見出し表示判定
+        const shouldShowBlockHeader = (circle, index) => {
+          if (sortOrder.value !== 'space' && sortOrder.value !== 'route') return false;
+          if (index === 0) return true;
+          const prev = sortedSavedCircles.value[index - 1];
+          return !prev || prev.space_sym !== circle.space_sym;
+        };
+
+        const sortedSavedCircles = computed(() => {
+          let list = circles.value.filter(c => savedList.value[c.circle_id]);
+          if (hideBought.value) {
+            list = list.filter(c => !savedList.value[c.circle_id].bought && !savedList.value[c.circle_id].soldout);
+          }
+          if (sortOrder.value === 'route') {
+            // 🗺️ 会場入口起点・通路グラフに沿った巡回ルート順 (#1 -> #2 -> #3...)
+            const orderMap = patrolOrderMap.value;
+            const prioWeight = { 'S': 3, 'A': 2, 'B': 1, '': 0 };
+            list.sort((a, b) => {
+              const oa = orderMap[a.circle_id];
+              const ob = orderMap[b.circle_id];
+              if (oa !== undefined && ob !== undefined) return oa - ob;
+              if (oa !== undefined) return -1;
+              if (ob !== undefined) return 1;
+
+              const aData = savedList.value[a.circle_id] || {};
+              const bData = savedList.value[b.circle_id] || {};
+              // 1. 未購入優先 (0: 未購入 -> 1: 購入済 -> 2: 完売)
+              const aStatus = aData.soldout ? 2 : (aData.bought ? 1 : 0);
+              const bStatus = bData.soldout ? 2 : (bData.bought ? 1 : 0);
+              if (aStatus !== bStatus) return aStatus - bStatus;
+
+              // 2. ブロック記号順 (A -> B -> C ...)
+              if (a.space_sym !== b.space_sym) {
+                return (a.space_sym || '').localeCompare(b.space_sym || '');
+              }
+
+              // 3. 同一ブロック内では S優先度（壁・最優先）を先に
+              const wa = prioWeight[aData.priority || ''];
+              const wb = prioWeight[bData.priority || ''];
+              if (wa !== wb) return wb - wa;
+
+              // 4. スペース番号順 (01 -> 02 ...)
+              return (parseInt(a.space_num) || 0) - (parseInt(b.space_num) || 0);
+            });
+            return list;
+          }
+
+          if (sortOrder.value === 'space') {
+            list.sort((a, b) => {
+              // 1. ブロック記号順
+              if (a.space_sym !== b.space_sym) return (a.space_sym || '').localeCompare(b.space_sym || '');
+              // 2. ブロック内でのステータス順 (未完了: 0 -> 購入済: 1 -> 完売: 2)
+              const aData = savedList.value[a.circle_id] || {};
+              const bData = savedList.value[b.circle_id] || {};
+              const aStatus = aData.soldout ? 2 : (aData.bought ? 1 : 0);
+              const bStatus = bData.soldout ? 2 : (bData.bought ? 1 : 0);
+              if (aStatus !== bStatus) return aStatus - bStatus;
+              // 3. スペース番号順
+              return (parseInt(a.space_num) || 0) - (parseInt(b.space_num) || 0);
+            });
+            return list;
+          }
+
+          if (sortOrder.value === 'priority') {
+            const weight = { 'S': 3, 'A': 2, 'B': 1, '': 0 };
+            list.sort((a, b) => {
+              const wa = weight[savedList.value[a.circle_id].priority || ''];
+              const wb = weight[savedList.value[b.circle_id].priority || ''];
+              if (wa !== wb) return wb - wa;
+              return 0; 
+            });
+          } else if (sortOrder.value === 'recent') {
+            list.sort((a, b) => {
+              const extraA = circleExtraInfo.value[a.circle_id] || {};
+              const extraB = circleExtraInfo.value[b.circle_id] || {};
+              const hasOshiA = Boolean((extraA.oshinagaki_url || '').trim()) || ((extraA.items || []).length > 0);
+              const hasOshiB = Boolean((extraB.oshinagaki_url || '').trim()) || ((extraB.items || []).length > 0);
+              if (hasOshiA !== hasOshiB) return hasOshiA ? -1 : 1;
+              const timeA = extraA.updated_at ? (Date.parse(extraA.updated_at) || 0) : 0;
+              const timeB = extraB.updated_at ? (Date.parse(extraB.updated_at) || 0) : 0;
+              if (timeA !== timeB) return timeB - timeA;
+              if (a.space_sym !== b.space_sym) return (a.space_sym || '').localeCompare(b.space_sym || '');
+              return (parseInt(a.space_num) || 0) - (parseInt(b.space_num) || 0);
+            });
+          }
+
+          // ★ 完売・スキップ（soldout）および購入済み（bought）を最下部に退避
+          // 順序: 0 = 未完了(最優先で上に来る), 1 = 購入済み, 2 = 完売・スキップ
+          list.sort((a, b) => {
+            const aData = savedList.value[a.circle_id] || {};
+            const bData = savedList.value[b.circle_id] || {};
+            const aStatus = aData.soldout ? 2 : (aData.bought ? 1 : 0);
+            const bStatus = bData.soldout ? 2 : (bData.bought ? 1 : 0);
+            return aStatus - bStatus;
+          });
+
+          return list;
+        });
+
+        const availableTags = computed(() => {
+          const tags = new Set();
+          const members = new Set();
+          Object.values(circleExtraInfo.value).forEach(info => {
+            (info.tags || []).forEach(t => {
+              if (!String(t).startsWith('__')) tags.add(t);
+            });
+            (info.members || []).forEach(m => members.add(m));
+          });
+          return { tags: Array.from(tags).sort(), members: Array.from(members).sort() };
+        });
+
+                const relatedCircles = computed(() => {
+          if (!selectedCircle.value) return [];
+          const currentMembers = circleExtraInfo.value[selectedCircle.value.circle_id]?.members || [];
+          if (currentMembers.length === 0) return [];
+          return circles.value.filter(c => {
+            if (c.circle_id === selectedCircle.value.circle_id) return false;
+            const members = circleExtraInfo.value[c.circle_id]?.members || [];
+            return currentMembers.some(m => members.includes(m));
+          }).slice(0, 10);
+        });
+
+        const filteredCircles = computed(() => {
+          const q = (searchQuery.value || '').trim().toLowerCase();
+          const result = circles.value.filter(circle => {
+            const extra = circleExtraInfo.value[circle.circle_id] || {};
+            
+            // ★ 商品名での部分一致
+            const matchItemName = q && (extra.items || []).some(it => 
+              it.name && it.name.toLowerCase().includes(q)
+            );
+
+            // ★ スペース配置（例: "M-31", "M31"）での部分一致
+            const spaceFull = `${circle.space_sym || ''}-${circle.space_num || ''}`.toLowerCase();
+            const spaceCompact = `${circle.space_sym || ''}${circle.space_num || ''}`.toLowerCase();
+            const matchSpace = q && (spaceFull.includes(q) || spaceCompact.includes(q));
+
+            const matchQuery = !q || 
+              (circle.circle_name && circle.circle_name.toLowerCase().includes(q)) ||
+              (circle.penname && circle.penname.toLowerCase().includes(q)) ||
+              (circle.circle_kana && circle.circle_kana.includes(q)) ||
+              matchSpace ||
+              matchItemName;
+
+            const matchBlock = !filterBlock.value || circle.space_sym === filterBlock.value;
+            const matchMember = selectedMembers.value.length === 0 || 
+              selectedMembers.value.some(m => (extra.members || []).includes(m));
+            const matchItemTag = !filterItemTag.value || (extra.tags || []).includes(filterItemTag.value);
+              
+            const matchOshinagaki = !filterHasOshinagaki.value || Boolean(extra.oshinagaki_url) || ((extra.items || []).length > 0);
+            const matchRecent = !filterRecentOnly.value || isRecentOshinagakiUpdate(circle.circle_id);
+            const matchAbsent = !hideAbsent.value || !isCircleAbsent(circle.circle_id);
+              
+            return matchQuery && matchBlock && matchMember && matchItemTag && matchOshinagaki && matchRecent && matchAbsent;
+          });
+
+          if (searchSortOrder.value === 'recent') {
+            return [...result].sort((a, b) => {
+              const extraA = circleExtraInfo.value[a.circle_id] || {};
+              const extraB = circleExtraInfo.value[b.circle_id] || {};
+              const hasOshiA = Boolean((extraA.oshinagaki_url || '').trim()) || ((extraA.items || []).length > 0);
+              const hasOshiB = Boolean((extraB.oshinagaki_url || '').trim()) || ((extraB.items || []).length > 0);
+              if (hasOshiA !== hasOshiB) return hasOshiA ? -1 : 1;
+              const timeA = extraA.updated_at ? (Date.parse(extraA.updated_at) || 0) : 0;
+              const timeB = extraB.updated_at ? (Date.parse(extraB.updated_at) || 0) : 0;
+              if (timeA !== timeB) return timeB - timeA;
+              if (a.space_sym !== b.space_sym) return (a.space_sym || '').localeCompare(b.space_sym || '');
+              return (parseInt(a.space_num) || 0) - (parseInt(b.space_num) || 0);
+            });
+          }
+
+          return result;
+        });
+
+        // ★ サークル参加モード解放判定 (Jamj__Otaku アカウント または register_data 行保持者)
+        const isCircleModeEnabled = computed(() => {
+          if (isReadOnly.value) return false;
+          if (user.value && user.value.email) {
+            const emailLower = user.value.email.toLowerCase();
+            if (emailLower.startsWith('jamj__otaku@') || hasRegisterRowInCloud.value) {
+              return true;
+            }
+          }
+          // 圏外リロード時でも直前にJamj__Otakuでログインしていれば解放を維持
+          if (!isOnline.value && localStorage.getItem('vggc12th_circle_mode_unlocked') === 'true') {
+            return true;
+          }
+          return false;
+        });
+
+        watch(user, async (u) => {
+          if (u && u.email && u.email.toLowerCase().startsWith('jamj__otaku@')) {
+            try { localStorage.setItem('vggc12th_circle_mode_unlocked', 'true'); } catch (e) {}
+          } else if (u && isOnline.value) {
+            try {
+              const { data } = await supabaseClient
+                .from('register_data')
+                .select('circle_id')
+                .eq('user_id', u.id)
+                .maybeSingle();
+              if (data && data.circle_id) {
+                hasRegisterRowInCloud.value = true;
+                try { localStorage.setItem('vggc12th_circle_mode_unlocked', 'true'); } catch (e) {}
+              }
+            } catch (e) {}
+          }
+        }, { immediate: true });
+
+        const registerCircle = computed(() => {
+          return circles.value.find(c => c.circle_id === REGISTER_CIRCLE_ID) || {
+            circle_id: REGISTER_CIRCLE_ID,
+            circle_name: 'Black Stance',
+            space_sym: 'M',
+            space_num: '15-16',
+            penname: 'BLΔCK'
+          };
+        });
+
+        const registerCircleExtra = computed(() => {
+          return circleExtraInfo.value[REGISTER_CIRCLE_ID] || { items: [] };
+        });
+
+        const onTogglePublic = async (newVal) => {
+          isPublic.value = newVal;
+          if (user.value) {
+            const nowIso = new Date().toISOString();
+            const { data, error } = await supabaseClient
+              .from('shopping_lists')
+              .upsert(
+                { user_id: user.value.id, list_data: savedList.value, is_public: newVal, updated_at: nowIso },
+                { onConflict: 'user_id' }
+              )
+              .select('id')
+              .maybeSingle();
+            if (!error && data?.id) {
+              listId.value = data.id;
+            } else if (error && error.code === '42P10') {
+              await supabaseClient.from('shopping_lists').update({ is_public: newVal }).eq('user_id', user.value.id);
+            }
+          }
+        };
+        const signOut = async () => {
+          await supabaseClient.auth.signOut();
+          savedList.value = {};
+          listId.value = null;
+          isPublic.value = false;
+          freeMemoText.value = '';
+          timelineEvents.value = [];
+          hasRegisterRowInCloud.value = false;
+          try { localStorage.removeItem('vggc12th_circle_mode_unlocked'); } catch (e) {}
+          if (activeTab.value === 'register') activeTab.value = 'search';
+        };
+        const exitReadOnly = () => { const url = new URL(window.location.href); url.searchParams.delete('list'); window.location.href = url.toString(); };
+
+        
+</script>
+
+<style scoped>
+
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .custom-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+
+
+    body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+    button, a, label, select, input, textarea { touch-action: manipulation; }
+    
+    .map-container { 
+      position: relative; 
+      width: 100%; 
+      height: 100%;
+      overflow: auto; 
+      background: #fff; 
+      -webkit-overflow-scrolling: touch; 
+    }
+    
+    .map-inner {
+      position: relative;
+      width: max-content; 
+      transform: translateZ(0); 
+    }
+
+    .map-image {  
+      width: 900px; 
+      max-width: none !important; 
+      display: block; 
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none; 
+      transform: translateZ(0);
+    }
+
+    .list-map-dot {
+      position: absolute;
+      border-radius: 9999px;
+      border: 1px solid #ffffff;
+      box-sizing: border-box;
+      transform: translate3d(-50%, -50%, 0);
+      will-change: left, top, width, height;
+      backface-visibility: hidden;
+    }
+
+    .map-route-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 8;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .route-order-badge {
+      position: absolute;
+      min-width: 15px;
+      height: 15px;
+      padding: 0 3px;
+      border-radius: 9999px;
+      border: 1.5px solid #ffffff;
+      font-size: 9px;
+      font-weight: 900;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.55);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      will-change: left, top, transform;
+    }
+    .route-order-badge:hover {
+      box-shadow: 0 2px 6px rgba(236, 72, 153, 0.75);
+    }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    .modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
+    .modal-enter-from, .modal-leave-to { opacity: 0; transform: translateY(10px); }
+    
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    [v-cloak] { display: none; }
+
+    .draggable-pin {
+      position: absolute; 
+      width: 32px; 
+      height: 32px; 
+      transform: translate3d(-50%, -100%, 0); 
+      cursor: grab; 
+      z-index: 15; 
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      will-change: left, top;
+      backface-visibility: hidden;
+    }
+    .draggable-pin:active { cursor: grabbing; }
+  
+</style>

@@ -1,0 +1,39 @@
+{
+  "name": "vggc-13th",
+  "version": "2.0.0-alpha.0",
+  "main": "postcss.config.js",
+  "scripts": {
+    "test": "node scripts/test-offline-rehearsal.js && node scripts/test-route-graph.js",
+    "test:offline": "node scripts/test-offline-rehearsal.js",
+    "test:route": "node scripts/test-route-graph.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jamjotaku/VGGC-13th.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jamjotaku/VGGC-13th/issues"
+  },
+  "homepage": "https://github.com/jamjotaku/VGGC-13th#readme",
+  "description": "",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1",
+    "vite-plugin-pwa": "^2.0.0"
+  },
+  "type": "module"
+}

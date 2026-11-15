@@ -1,0 +1,11 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.local
+.env.*.local
+scripts/*
+!scripts/test-offline-rehearsal.js
+!scripts/test-route-graph.js
+!scripts/archive-vggc12th.js
+!scripts/reset-to-shell.js
