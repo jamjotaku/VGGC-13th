@@ -7,6 +7,41 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  // バックエンド設定・DB疎通ヘルスチェック（秘密鍵の値は一切返さない）
+  if (req.method === 'GET') {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const hasSupabaseUrl = Boolean(supabaseUrl);
+    const hasServiceRoleKey = Boolean(serviceRoleKey);
+    let dbMembershipsReady = false;
+    let dbInviteCodesReady = false;
+
+    if (hasSupabaseUrl && hasServiceRoleKey) {
+      try {
+        const headers = {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`
+        };
+        const [mRes, iRes] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/circle_memberships?select=id&limit=1`, { headers }),
+          fetch(`${supabaseUrl}/rest/v1/circle_invite_codes?select=id&limit=1`, { headers })
+        ]);
+        dbMembershipsReady = mRes.ok;
+        dbInviteCodesReady = iRes.ok;
+      } catch (e) {}
+    }
+
+    return res.status(200).json({
+      ok: true,
+      hasSupabaseUrl,
+      hasServiceRoleKey,
+      dbMembershipsReady,
+      dbInviteCodesReady,
+      readyForPersistence: hasSupabaseUrl && hasServiceRoleKey && dbMembershipsReady && dbInviteCodesReady
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'METHOD_NOT_ALLOWED' });
   }
