@@ -1,13 +1,15 @@
-export const STORAGE_KEY = 'vggc12th_saved_list';
+import { EVENT_CONFIG } from './eventConfig';
+
+export const STORAGE_KEY = EVENT_CONFIG.storageKey('saved_list');
 
 export const EVENT_INFO = {
-  name: 'VGGC 12th',
-  date: '2026-11-14',
-  venue: 'TRC第一展示場 (A-Dホール)',
-  start: '2026-11-14T12:00:00+09:00',
-  end: '2026-11-14T15:30:00+09:00',
-  dayStart: '2026-11-14T00:00:00+09:00',
-  dayEnd: '2026-11-15T00:00:00+09:00'
+  name: EVENT_CONFIG.name,
+  date: EVENT_CONFIG.date,
+  venue: EVENT_CONFIG.venue,
+  start: EVENT_CONFIG.start,
+  end: EVENT_CONFIG.end,
+  dayStart: EVENT_CONFIG.dayStart,
+  dayEnd: EVENT_CONFIG.dayEnd
 };
 
 export const vspoDict = [

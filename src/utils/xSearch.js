@@ -3,6 +3,8 @@
  * すべて `&f=live` (最新順) を指定して現地での即時性を最大化
  */
 
+import { EVENT_CONFIG } from '../eventConfig';
+
 const BASE_X_SEARCH_URL = 'https://x.com/search';
 
 /**
@@ -192,7 +194,7 @@ export const getCircleOfficialSearchUrl = (circle, extraInfo = null) => {
     const circleName = circle.circle_name;
     const penname = circle.penname || '';
     
-    query = `("${circleName}" OR "${penname}") ("${spaceWithHyphen}" OR "#VGGC12th") ${keywords}`;
+    query = `("${circleName}" OR "${penname}") ("${spaceWithHyphen}" OR "${EVENT_CONFIG.hashtag}") ${keywords}`;
   }
 
   return `${BASE_X_SEARCH_URL}?q=${encodeURIComponent(query)}&f=live`;
@@ -220,12 +222,13 @@ export const getCirclePublicSearchUrl = (circle) => {
  * @param {'soldout' | 'line' | 'all'} type 
  */
 export const getEventLiveSearchUrl = (type = 'all') => {
-  let query = '#VGGC12th';
+  const tag = EVENT_CONFIG.hashtag;
+  let query = tag;
 
   if (type === 'soldout') {
-    query = '#VGGC12th (完売 OR 売り切れ OR 終了 OR なくなった)';
+    query = `${tag} (完売 OR 売り切れ OR 終了 OR なくなった)`;
   } else if (type === 'line') {
-    query = '#VGGC12th (列 OR 最後尾 OR 待機列 OR 混雑 OR シャッター)';
+    query = `${tag} (列 OR 最後尾 OR 待機列 OR 混雑 OR シャッター)`;
   }
 
   return `${BASE_X_SEARCH_URL}?q=${encodeURIComponent(query)}&f=live`;

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
+import { EVENT_CONFIG } from './src/eventConfig.js';
 
 export default defineConfig({
   plugins: [
@@ -17,9 +18,9 @@ export default defineConfig({
         'map_routes.json'
       ],
       manifest: {
-        name: 'VGGC 12th サークルリスト＆マップ',
-        short_name: 'VGGC 12th',
-        description: 'ぶいすぽっ！オンリー即売会「VGGC 12th」のサークル配置マップ、お品書き・商品管理、買い物リスト作成ツール（完全オフライン対応）',
+        name: `${EVENT_CONFIG.name} サークルリスト＆マップ`,
+        short_name: EVENT_CONFIG.shortName,
+        description: EVENT_CONFIG.manifestDescription,
         start_url: '/',
         scope: '/',
         theme_color: '#2563eb',

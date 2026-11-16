@@ -161,7 +161,7 @@
             <!-- 土曜営業のATM・コンビニスポット一覧 -->
             <div class="space-y-2">
               <div class="text-[11px] font-bold text-gray-700 flex items-center justify-between">
-                <span>📍 土曜日(11/14) 営業スポット</span>
+                <span>📍 土曜日({{ EVENT_CONFIG.dateShort }}) 営業スポット</span>
                 <span class="text-[10px] text-gray-400">TRC敷地内</span>
               </div>
 
@@ -237,6 +237,9 @@
 <script setup>
 import { ref } from 'vue';
 import PersonalTimeline from './PersonalTimeline.vue';
+import { EVENT_CONFIG } from '../eventConfig';
+
+const CHECKLIST_STORAGE_KEY = EVENT_CONFIG.storageKey('checklist');
 
 const props = defineProps({
   freeMemoText: {
@@ -284,7 +287,7 @@ const isGuideOpen = ref(true);
 
 // 持ち物チェックリストのキャッシュ復元
 try {
-  const storedList = localStorage.getItem('vggc12th_checklist');
+  const storedList = localStorage.getItem(CHECKLIST_STORAGE_KEY);
   if (storedList) {
     checklist.value = JSON.parse(storedList);
   } else {
@@ -296,7 +299,7 @@ try {
 
 const saveChecklist = () => {
   try {
-    localStorage.setItem('vggc12th_checklist', JSON.stringify(checklist.value));
+    localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(checklist.value));
   } catch (e) {}
 };
 

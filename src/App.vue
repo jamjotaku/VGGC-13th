@@ -7,7 +7,7 @@
     <!-- ナビゲーションバー (レジモード時は非表示にして全画面化) -->
     <nav v-show="activeTab !== 'register'" class="bg-white shadow-sm border-b px-3 md:px-4 py-2 md:py-2.5 flex justify-between items-center z-20 flex-shrink-0">
       <div class="font-bold text-base md:text-lg flex items-center gap-2">
-        VGGC 12th 
+        {{ EVENT_CONFIG.name }}
         <span v-if="isReadOnly" class="text-[10px] md:text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full font-bold">閲覧専用</span>
         <!-- 全員に見えるオフライン/圏外インジケーター -->
         <span v-if="!isOnline" class="text-[10px] md:text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm" title="圏外（保存済みデータで動作中）">
@@ -436,7 +436,7 @@
                 </a>
                 <a :href="getEventLiveSearchUrl('all')" target="_blank" 
                    class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
-                  <span>📢 #VGGC12th</span>
+                  <span>📢 {{ EVENT_CONFIG.hashtag }}</span>
                 </a>
               </div>
             </div>
@@ -464,8 +464,8 @@
             <span v-if="timelineEvents.length > 0" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-mono font-bold shadow-xs">{{ timelineEvents.length }}</span>
           </button>
           <button v-if="isCircleModeEnabled" @click="activeTab = 'register'" :class="activeTab === 'register' ? 'border-amber-500 text-amber-800 bg-amber-50/70' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
-            <span>🏪 レジ (M-15-16)</span>
-            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">Black Stance</span>
+            <span>🏪 レジ ({{ registerCircle.space_sym }}-{{ registerCircle.space_num }})</span>
+            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">{{ registerCircle.circle_name }}</span>
           </button>
         </div>
 
@@ -770,7 +770,7 @@
                探す (検索) タブ
           ========================================== -->
           <div v-show="activeTab === 'search'" class="flex flex-col min-h-full pb-28 md:pb-8">
-            <div class="p-2.5 md:p-3.5 bg-gray-50/95 backdrop-blur-md sticky top-0 z-20 border-b border-gray-200 shadow-xs">
+            <div class="p-2.5 md:p-3.5 bg-gray-50/95 backdrop-blur-md sticky top-0 z-20 border-b border-gray-200 shadow-xs space-y-2">
               <!-- 検索入力ボックス -->
               <div class="relative shadow-xs rounded-xl overflow-hidden bg-white border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -781,64 +781,35 @@
                 
                 <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
                   <kbd v-if="!searchQuery" class="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-100 border border-gray-200 rounded">/</kbd>
-                  <button v-if="searchQuery" @click="searchQuery = ''" class="p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer" title="クリア">
+                  <button v-if="searchQuery" @click="searchQuery = ''" class="p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer" title="クリア">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                   </button>
                 </div>
               </div>
 
-              <!-- 検索結果件数 ＆ クイック絞り込みバー -->
-              <div class="mt-2 flex items-center justify-between gap-1.5 px-0.5 flex-wrap">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="text-xs font-extrabold text-gray-700">
+              <!-- 検索結果件数 ＆ コンパクト操作バー（折り返しなし1行設計） -->
+              <div class="flex items-center justify-between gap-2 px-0.5">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-xs font-extrabold text-gray-700 shrink-0">
                     全 <span class="text-blue-600 font-mono text-sm">{{ filteredCircles.length }}</span> 件
                   </span>
-
-                  <!-- 選択中のフィルターチップ（パネルを閉じていても一目で分かりワンタップ解除可能） -->
-                  <button v-if="filterBlock" @click="selectBlockAndFocusMap(filterBlock, false)"
-                          class="text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-blue-200 transition cursor-pointer">
-                    <span>📍 {{ filterBlock }}</span>
-                    <span>×</span>
-                  </button>
-                  <button v-for="m in selectedMembers" :key="'chip_'+m" @click="toggleMemberFilter(m)"
-                          class="text-[11px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition cursor-pointer shadow-2xs"
-                          :style="getMemberStyle(m)">
-                    <span>{{ getMemberMark(m) }}{{ m }}</span>
-                    <span>×</span>
-                  </button>
-                  <button v-if="filterItemTag" @click="filterItemTag = ''"
-                          class="text-[11px] font-bold bg-gray-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-gray-700 transition cursor-pointer">
-                    <span>#{{ filterItemTag }}</span>
-                    <span>×</span>
-                  </button>
-                  <button v-if="filterRecentOnly" @click="filterRecentOnly = false"
-                          class="text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-rose-200 transition cursor-pointer">
-                    <span>🆕 48h新着のみ</span>
-                    <span>×</span>
-                  </button>
-                  <button v-if="hideAbsent" @click="hideAbsent = false"
-                          class="text-[11px] font-bold bg-slate-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-slate-700 transition cursor-pointer shadow-2xs">
-                    <span>🚫 欠席非表示</span>
-                    <span>×</span>
-                  </button>
-
-                  <button v-if="searchQuery || filterBlock || selectedMembers.length > 0 || filterItemTag || filterHasOshinagaki || filterRecentOnly || hideAbsent || searchSortOrder !== 'space'"
+                  <button v-if="searchQuery || activeSearchFilterCount > 0 || searchSortOrder !== 'space'"
                           @click="resetAllFilters"
-                          class="text-[11px] font-bold text-rose-600 hover:underline px-1 py-0.5 cursor-pointer">
-                    クリア
+                          class="text-[11px] font-bold text-rose-600 hover:underline px-1.5 py-0.5 rounded bg-rose-50/70 border border-rose-200/70 shrink-0 cursor-pointer">
+                    リセット
                   </button>
                 </div>
 
-                <div class="flex items-center gap-1.5 ml-auto flex-wrap">
-                  <!-- ★ 新着お品書き順ソート切替ボタン -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <!-- 新着順切替トグル -->
                   <button @click="searchSortOrder = searchSortOrder === 'recent' ? 'space' : 'recent'"
                           type="button"
-                          class="px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 shadow-xs shrink-0 cursor-pointer select-none"
+                          class="min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 shadow-xs shrink-0 cursor-pointer select-none"
                           :class="searchSortOrder === 'recent'
                             ? 'bg-gradient-to-r from-rose-500 to-orange-500 border-rose-500 text-white ring-1 ring-rose-300'
                             : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'"
                           title="直近でお品書きや頒布物が登録・更新されたサークルを新しい順に表示します">
-                    <span>{{ searchSortOrder === 'recent' ? '🆕 新着順:ON' : '🆕 新着順' }}</span>
+                    <span>{{ searchSortOrder === 'recent' ? '🆕 新着順' : '🆕 新着' }}</span>
                     <span v-if="recentOshinagakiCount > 0"
                           class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold"
                           :class="searchSortOrder === 'recent' ? 'bg-white text-rose-600' : 'bg-rose-100 text-rose-700'">
@@ -846,101 +817,175 @@
                     </span>
                   </button>
 
-                  <!-- お品書き公開済みのみ 絞り込みトグル -->
-                  <label class="flex items-center gap-1 cursor-pointer text-xs font-bold transition select-none px-2.5 py-1 rounded-xl border shadow-xs shrink-0"
-                         :class="filterHasOshinagaki ? 'bg-amber-100 border-amber-400 text-amber-950 ring-1 ring-amber-300' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-                    <input type="checkbox" v-model="filterHasOshinagaki" class="accent-amber-600 w-3.5 h-3.5">
-                    <span>📸 お品書き有</span>
-                  </label>
-
-                  <!-- フィルター開閉トグル -->
-                  <button @click="showSearchFilters = !showSearchFilters"
-                          class="px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 shadow-xs cursor-pointer"
-                          :class="(showSearchFilters || filterBlock || selectedMembers.length > 0 || filterItemTag || filterRecentOnly || hideAbsent) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                  <!-- 絞り込みボトムシートを開くボタン -->
+                  <button @click="showSearchFilters = true"
+                          type="button"
+                          class="min-h-[34px] px-3 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 shadow-xs cursor-pointer select-none"
+                          :class="activeSearchFilterCount > 0 ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
                     <span>🌪️ 絞り込み</span>
-                    <span v-if="selectedMembers.length > 0 || hideAbsent" class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono font-bold">
-                      {{ selectedMembers.length + (hideAbsent ? 1 : 0) }}
+                    <span v-if="activeSearchFilterCount > 0" class="px-1.5 py-0.2 bg-white text-blue-700 rounded-full text-[10px] font-mono font-extrabold">
+                      {{ activeSearchFilterCount }}
                     </span>
-                    <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="showSearchFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                   </button>
                 </div>
               </div>
-              
-              <!-- ★ 絞り込みフィルター群 (ブロック / メンバー / タグ / 新着 / 欠席 クロス検索対応) -->
-              <div v-show="showSearchFilters" class="mt-2 pt-2 border-t border-gray-200/80 space-y-1.5 px-0.5">
-                <!-- 更新状況＆欠席クイック絞り込み -->
-                <div class="flex items-center gap-2">
-                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">状況</span>
-                  <div class="flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar flex-1 items-center">
-                    <!-- 直近48時間更新 -->
-                    <button @click="filterRecentOnly = !filterRecentOnly"
+
+              <!-- 選択中のフィルターチップ（1行横スクロールで画面縦幅を圧迫しない） -->
+              <div v-if="activeSearchFilterCount > 0" class="flex items-center gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar flex-nowrap">
+                <button v-if="filterHasOshinagaki" @click="filterHasOshinagaki = false"
+                        class="text-[11px] font-bold bg-amber-100 text-amber-950 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer">
+                  <span>📸 お品書き有</span><span>×</span>
+                </button>
+                <button v-if="filterBlock" @click="selectBlockAndFocusMap(filterBlock, false)"
+                        class="text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer">
+                  <span>📍 {{ filterBlock }}</span><span>×</span>
+                </button>
+                <button v-for="m in selectedMembers" :key="'chip_'+m" @click="toggleMemberFilter(m)"
+                        class="text-[11px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                        :style="getMemberStyle(m)">
+                  <span>{{ getMemberMark(m) }}{{ m }}</span><span>×</span>
+                </button>
+                <button v-if="filterItemTag" @click="filterItemTag = ''"
+                        class="text-[11px] font-bold bg-gray-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer">
+                  <span>#{{ filterItemTag }}</span><span>×</span>
+                </button>
+                <button v-if="filterRecentOnly" @click="filterRecentOnly = false"
+                        class="text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer">
+                  <span>🆕 48h新着のみ</span><span>×</span>
+                </button>
+                <button v-if="hideAbsent" @click="hideAbsent = false"
+                        class="text-[11px] font-bold bg-slate-800 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs">
+                  <span>🚫 欠席非表示</span><span>×</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ★ 絞り込みボトムシート（スマホは下からスライドアップ / PCは中央モーダル） -->
+            <teleport to="body">
+              <div v-if="showSearchFilters"
+                   @click.self="showSearchFilters = false"
+                   class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end md:items-center justify-center p-0 md:p-4">
+                <div class="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-150">
+                  <!-- シートヘッダー -->
+                  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base">🌪️</span>
+                      <h3 class="font-extrabold text-sm md:text-base text-gray-900">サークルの絞り込み</h3>
+                      <span v-if="activeSearchFilterCount > 0" class="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                        {{ activeSearchFilterCount }}件選択中
+                      </span>
+                    </div>
+                    <button @click="showSearchFilters = false"
+                            class="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold cursor-pointer">
+                      ✕
+                    </button>
+                  </div>
+
+                  <!-- シート本体（スクロール可） -->
+                  <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                    <!-- 表示・更新条件 -->
+                    <div class="space-y-2">
+                      <div class="text-xs font-extrabold text-gray-600">表示条件・更新状況</div>
+                      <div class="flex flex-wrap gap-2">
+                        <button @click="filterHasOshinagaki = !filterHasOshinagaki"
+                                type="button"
+                                class="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer"
+                                :class="filterHasOshinagaki ? 'bg-amber-100 border-amber-400 text-amber-950 ring-1 ring-amber-300' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                          <span>📸 お品書き公開済のみ</span>
+                        </button>
+                        <button @click="filterRecentOnly = !filterRecentOnly"
+                                type="button"
+                                class="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer"
+                                :class="filterRecentOnly ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-rose-500 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                          <span>🆕 直近48時間更新 ({{ recentOshinagakiCount }}件)</span>
+                        </button>
+                        <button @click="hideAbsent = !hideAbsent"
+                                type="button"
+                                class="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer"
+                                :class="hideAbsent ? 'bg-slate-800 text-white border-slate-900 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                          <span>🚫 欠席・不参加を除く{{ absentCirclesCount > 0 ? ` (${absentCirclesCount}件)` : '' }}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 配置ブロック -->
+                    <div class="space-y-2">
+                      <div class="text-xs font-extrabold text-gray-600">配置ブロック</div>
+                      <div class="flex flex-wrap gap-1.5">
+                        <button @click="filterBlock = ''; targetSpace = null"
+                                class="min-h-[36px] px-3 py-1 text-xs font-bold rounded-xl transition cursor-pointer"
+                                :class="!filterBlock ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">
+                          すべて
+                        </button>
+                        <button v-for="b in blocks" :key="'sb_'+b" @click="selectBlockAndFocusMap(b, false)"
+                                class="min-w-[38px] min-h-[36px] px-2.5 py-1 text-xs font-extrabold rounded-xl border transition cursor-pointer"
+                                :class="filterBlock === b ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                          {{ b }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- メンバー（複数選択可） -->
+                    <div v-if="availableTags.members.length" class="space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold text-gray-600">ぶいすぽメンバー（複数選択可）</span>
+                        <button v-if="selectedMembers.length > 0" @click="selectedMembers = []" class="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+                          選択解除
+                        </button>
+                      </div>
+                      <div class="flex flex-wrap gap-1.5">
+                        <button @click="selectedMembers = []"
+                                class="min-h-[36px] px-3 py-1 text-xs font-bold rounded-full transition cursor-pointer"
+                                :class="selectedMembers.length === 0 ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">
+                          すべて
+                        </button>
+                        <button v-for="m in availableTags.members" :key="'fm_'+m"
+                                @click="toggleMemberFilter(m)"
+                                class="min-h-[36px] px-3 py-1 text-xs font-bold rounded-full border flex items-center gap-1 transition cursor-pointer"
+                                :style="isMemberSelected(m) ? getMemberStyle(m) : {}"
+                                :class="!isMemberSelected(m) ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' : 'opacity-100 ring-2 ring-offset-1 ring-blue-500 font-black shadow-xs'">
+                          <span v-if="isMemberSelected(m)" class="text-[10px] font-black">✓</span>
+                          <span>{{ getMemberMark(m) }}</span>
+                          <span>{{ m }}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 頒布物タグ -->
+                    <div v-if="availableTags.tags.length" class="space-y-2">
+                      <div class="text-xs font-extrabold text-gray-600">頒布物・ジャンルタグ</div>
+                      <div class="flex flex-wrap gap-1.5">
+                        <button @click="filterItemTag = ''"
+                                class="min-h-[36px] px-3 py-1 text-xs font-bold rounded-full transition cursor-pointer"
+                                :class="!filterItemTag ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">
+                          すべて
+                        </button>
+                        <button v-for="t in availableTags.tags" :key="'ft_'+t"
+                                @click="filterItemTag = filterItemTag === t ? '' : t"
+                                class="min-h-[36px] px-3 py-1 text-xs font-bold rounded-full border transition cursor-pointer"
+                                :class="filterItemTag === t ? 'bg-blue-100 border-blue-400 text-blue-900 ring-2 ring-offset-1 ring-blue-200' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+                          {{ t }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- シートフッター -->
+                  <div class="p-3.5 border-t border-gray-200 bg-gray-50 flex items-center gap-2 shrink-0 pb-safe">
+                    <button @click="resetAllFilters"
                             type="button"
-                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition flex items-center gap-1 cursor-pointer shrink-0"
-                            :class="filterRecentOnly ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-rose-500 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-                      <span>🆕 直近48時間更新 ({{ recentOshinagakiCount }}件)</span>
+                            class="px-4 min-h-[44px] rounded-xl border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold transition cursor-pointer">
+                      条件リセット
                     </button>
-
-                    <!-- 当日欠席サークル除外 -->
-                    <button @click="hideAbsent = !hideAbsent"
+                    <button @click="showSearchFilters = false"
                             type="button"
-                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition flex items-center gap-1 cursor-pointer shrink-0"
-                            :class="hideAbsent ? 'bg-slate-800 text-white border-slate-900 shadow-2xs' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-                      <span>🚫 欠席・不参加を除く{{ absentCirclesCount > 0 ? ` (${absentCirclesCount}件)` : '' }}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- ブロック横スクロール -->
-                <div class="flex items-center gap-2">
-                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">配置</span>
-                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1">
-                    <button @click="filterBlock = ''; targetSpace = null" class="px-2 py-0.5 text-xs font-bold rounded-lg whitespace-nowrap transition cursor-pointer" :class="!filterBlock ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">すべて</button>
-                    <button v-for="b in blocks" :key="'sb_'+b" @click="selectBlockAndFocusMap(b, false)"
-                            class="min-w-[30px] px-2 py-0.5 text-xs font-extrabold rounded-lg whitespace-nowrap border transition cursor-pointer"
-                            :class="filterBlock === b ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-                      {{ b }}
-                    </button>
-                  </div>
-                </div>
-
-                <!-- メンバー横スクロール (複数OR選択対応) -->
-                <div v-if="availableTags.members.length" class="flex items-center gap-2">
-                  <div class="flex items-center gap-1 w-16 shrink-0">
-                    <span class="text-[11px] font-bold text-gray-500">メンバー</span>
-                    <span v-if="selectedMembers.length > 0" class="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1 rounded-sm">
-                      {{ selectedMembers.length }}
-                    </span>
-                  </div>
-                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1 items-center">
-                    <button @click="selectedMembers = []" 
-                            class="px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap transition cursor-pointer" 
-                            :class="selectedMembers.length === 0 ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">
-                      すべて
-                    </button>
-                    <button v-for="m in availableTags.members" :key="'fm_'+m" 
-                            @click="toggleMemberFilter(m)" 
-                            class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border flex items-center gap-1 transition cursor-pointer" 
-                            :style="isMemberSelected(m) ? getMemberStyle(m) : {}" 
-                            :class="!isMemberSelected(m) ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' : 'opacity-100 ring-2 ring-offset-1 ring-blue-500 font-black shadow-xs'">
-                      <span v-if="isMemberSelected(m)" class="text-[10px] font-black">✓</span>
-                      <span>{{ getMemberMark(m) }}</span>
-                      <span>{{ m }}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- タグ横スクロール -->
-                <div v-if="availableTags.tags.length" class="flex items-center gap-2">
-                  <span class="text-[11px] font-bold text-gray-500 w-12 shrink-0">タグ</span>
-                  <div class="flex gap-1 overflow-x-auto pb-1 custom-scrollbar flex-1">
-                    <button @click="filterItemTag = ''" class="px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap transition cursor-pointer" :class="!filterItemTag ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'">すべて</button>
-                    <button v-for="t in availableTags.tags" :key="'ft_'+t" @click="filterItemTag = filterItemTag === t ? '' : t" class="px-2.5 py-0.5 text-xs font-bold rounded-full whitespace-nowrap border transition cursor-pointer" :class="filterItemTag === t ? 'bg-blue-100 border-blue-400 text-blue-900 ring-2 ring-offset-1 ring-blue-200' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-                      {{ t }}
+                            class="flex-1 min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold shadow-sm transition cursor-pointer">
+                      {{ filteredCircles.length }}件のサークルを表示
                     </button>
                   </div>
                 </div>
               </div>
-            </div>
+            </teleport>
             
             <!-- 検索結果 0件時のエンプティステート -->
             <div v-if="filteredCircles.length === 0" class="p-10 text-center my-6">
@@ -1239,7 +1284,7 @@
                 </a>
                 <a :href="getEventLiveSearchUrl('all')" target="_blank" 
                    class="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
-                  <span>📢 #VGGC12th 最新</span>
+                  <span>📢 {{ EVENT_CONFIG.hashtag }} 最新</span>
                 </a>
               </div>
             </div>
@@ -1351,7 +1396,7 @@
                                 'bg-yellow-400 text-slate-950 border-yellow-500': savedList[circle.circle_id].priority === 'A',
                                 'bg-blue-600 text-white border-blue-700': savedList[circle.circle_id].priority === 'B'
                               }">
-                          優先:{{ savedList[circle.circle_id].priority }}
+                          優先:{{ savedList[circle.circle_id].priority }}{{ savedList[circle.circle_id].priorityOrder ? `-${savedList[circle.circle_id].priorityOrder}` : '' }}
                         </span>
 
                         <h3 @click="openDetails(circle)" class="font-extrabold text-sm md:text-base leading-tight hover:text-pink-600 transition-colors cursor-pointer truncate max-w-full"
@@ -1568,25 +1613,32 @@
                     
                     <!-- 【第3段】お買い物プラン入力 ＆ 現場ステータストグル (44pxタッチ対応) -->
                     <div class="bg-gray-50/90 p-3 md:p-3.5 border-t border-gray-200/80 flex flex-col gap-2.5">
-                      <!-- 優先度・予算・誰用 (高コントラスト化) -->
-                      <div class="grid grid-cols-12 gap-2">
-                        <select v-model="savedList[circle.circle_id].priority" :disabled="isReadOnly" 
-                                class="col-span-5 h-9 text-xs border border-gray-300 rounded-xl px-2 bg-white focus:ring-2 focus:ring-pink-400 outline-none font-bold cursor-pointer" 
+                      <!-- 優先度・順番・予算・誰用 (高コントラスト化) -->
+                      <div class="grid grid-cols-12 gap-1.5">
+                        <select v-model="savedList[circle.circle_id].priority" @change="onPriorityChange(circle.circle_id)" :disabled="isReadOnly" 
+                                class="col-span-4 h-9 text-xs border border-gray-300 rounded-xl px-1.5 bg-white focus:ring-2 focus:ring-pink-400 outline-none font-bold cursor-pointer" 
                                 :class="priorityColors[savedList[circle.circle_id].priority]">
-                          <option value="">優先度: 未設定</option>
+                          <option value="">優先: 未設定</option>
                           <option value="S">優先: S (最優先)</option>
                           <option value="A">優先: A (買いたい)</option>
                           <option value="B">優先: B (見に行く)</option>
                         </select>
 
-                        <div class="col-span-4 h-9 flex items-center text-xs border border-gray-300 rounded-xl bg-white overflow-hidden focus-within:ring-2 focus-within:ring-pink-400">
-                          <span class="pl-2.5 pr-1 text-gray-500 font-bold">¥</span>
+                        <select v-model.number="savedList[circle.circle_id].priorityOrder" :disabled="isReadOnly || !savedList[circle.circle_id].priority"
+                                title="同優先度内の巡回順（未指定なら最短順）"
+                                class="col-span-2 h-9 text-xs border border-gray-300 rounded-xl px-1 bg-white focus:ring-2 focus:ring-pink-400 outline-none font-bold text-center cursor-pointer disabled:bg-gray-100 disabled:text-gray-400">
+                          <option :value="null">順:自動</option>
+                          <option v-for="n in 20" :key="'po_'+n" :value="n">#{{ n }}</option>
+                        </select>
+
+                        <div class="col-span-3 h-9 flex items-center text-xs border border-gray-300 rounded-xl bg-white overflow-hidden focus-within:ring-2 focus-within:ring-pink-400">
+                          <span class="pl-2 pr-0.5 text-gray-500 font-bold">¥</span>
                           <input type="number" v-model.number="savedList[circle.circle_id].price" :readonly="isReadOnly" placeholder="予定額" 
-                                 class="w-full py-1 pr-2.5 bg-transparent outline-none text-right font-mono font-bold text-gray-900 placeholder-gray-400">
+                                 class="w-full py-1 pr-2 bg-transparent outline-none text-right font-mono font-bold text-gray-900 placeholder-gray-400">
                         </div>
 
                         <input type="text" v-model="savedList[circle.circle_id].forWho" :readonly="isReadOnly" placeholder="誰用？" 
-                               class="col-span-3 h-9 text-xs border border-gray-300 rounded-xl px-2.5 bg-white outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 placeholder-gray-400 font-medium">
+                               class="col-span-3 h-9 text-xs border border-gray-300 rounded-xl px-2 bg-white outline-none focus:ring-2 focus:ring-pink-400 text-gray-800 placeholder-gray-400 font-medium">
                       </div>
 
                       <!-- メモ欄 (屋外でも見やすいコントラスト) -->
@@ -1754,6 +1806,7 @@ import mapRoutesData from './map_routes.json';
 import { calculatePatrolRoute } from './utils/routePlanner';
 import { supabaseClient } from './supabase';
 import { STORAGE_KEY, vspoDict, priorityColors } from './constants';
+import { EVENT_CONFIG } from './eventConfig';
 import { calculateCurrencyBreakdown } from './utils/currency';
 import { getEventCountdown, checkScheduleActive } from './utils/countdown';
 import { getMemberStyle, getMemberMark } from './utils/memberStyle';
@@ -1771,8 +1824,8 @@ import PwaUpdateToast from './components/PwaUpdateToast.vue';
 import CircleRegisterPanel from './components/CircleRegisterPanel.vue';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
 
-        // ★ サークル参加モード（簡易レジ v1: M-15-16 Black Stance / Jamj__Otaku 専用解放）
-        const REGISTER_CIRCLE_ID = '10ebdde686d91dfe1ab4a63376c7b377';
+        // ★ サークル参加モード（簡易レジ v1）
+        const REGISTER_CIRCLE_ID = EVENT_CONFIG.register.defaultCircleId;
         const hasRegisterRowInCloud = ref(false);
 
         const circles = ref([]);
@@ -1845,7 +1898,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           isMapImageError.value = false;
         };
         const showPcBlockPanel = ref(true);
-        const isListCompactMode = ref(localStorage.getItem('vggc12th_list_compact') === 'true');
+        const isListCompactMode = ref(localStorage.getItem(EVENT_CONFIG.storageKey('list_compact')) === 'true');
         const expandedCompactCircleId = ref(null);
         const mainScrollContainer = ref(null);
         const isListHeaderSlim = ref(false);
@@ -1871,15 +1924,15 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         const mapRoutes = ref((mapRoutesData && mapRoutesData.default) ? mapRoutesData.default : (mapRoutesData || {}));
 
         // ★ 巡回ルート描画ステート (デフォルト: ルート表示ON / 優先度順 / 最後のブースで終了 / 未購入対象)
-        const showRouteOverlay = ref(localStorage.getItem('vggc12th_show_route') !== 'false');
-        const routeOrderMode = ref(localStorage.getItem('vggc12th_route_order_mode') || 'priority'); // 'priority' | 'shortest'
-        const routeTargetFilter = ref(localStorage.getItem('vggc12th_route_target_filter') || 'all'); // 'all' | 'S' | 'SA' | 'include_done'
-        const routeReturnToEntrance = ref(localStorage.getItem('vggc12th_route_return') === 'true');
+        const showRouteOverlay = ref(localStorage.getItem(EVENT_CONFIG.storageKey('show_route')) !== 'false');
+        const routeOrderMode = ref(localStorage.getItem(EVENT_CONFIG.storageKey('route_order_mode')) || 'priority'); // 'priority' | 'shortest'
+        const routeTargetFilter = ref(localStorage.getItem(EVENT_CONFIG.storageKey('route_target_filter')) || 'all'); // 'all' | 'S' | 'SA' | 'include_done'
+        const routeReturnToEntrance = ref(localStorage.getItem(EVENT_CONFIG.storageKey('route_return')) === 'true');
 
-        watch(showRouteOverlay, (v) => { try { localStorage.setItem('vggc12th_show_route', String(v)); } catch (e) {} });
-        watch(routeOrderMode, (v) => { try { localStorage.setItem('vggc12th_route_order_mode', v); } catch (e) {} });
-        watch(routeTargetFilter, (v) => { try { localStorage.setItem('vggc12th_route_target_filter', v); } catch (e) {} });
-        watch(routeReturnToEntrance, (v) => { try { localStorage.setItem('vggc12th_route_return', String(v)); } catch (e) {} });
+        watch(showRouteOverlay, (v) => { try { localStorage.setItem(EVENT_CONFIG.storageKey('show_route'), String(v)); } catch (e) {} });
+        watch(routeOrderMode, (v) => { try { localStorage.setItem(EVENT_CONFIG.storageKey('route_order_mode'), v); } catch (e) {} });
+        watch(routeTargetFilter, (v) => { try { localStorage.setItem(EVENT_CONFIG.storageKey('route_target_filter'), v); } catch (e) {} });
+        watch(routeReturnToEntrance, (v) => { try { localStorage.setItem(EVENT_CONFIG.storageKey('route_return'), String(v)); } catch (e) {} });
 
         const toggleRouteOverlay = () => {
           showRouteOverlay.value = !showRouteOverlay.value;
@@ -1892,7 +1945,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           isListCompactMode.value = !isListCompactMode.value;
           expandedCompactCircleId.value = null;
           try {
-            localStorage.setItem('vggc12th_list_compact', String(isListCompactMode.value));
+            localStorage.setItem(EVENT_CONFIG.storageKey('list_compact'), String(isListCompactMode.value));
           } catch (e) {}
         };
 
@@ -1997,6 +2050,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
               x: pos.x,
               y: pos.y,
               priority,
+              priorityOrder: saved.priorityOrder || null,
               isCompleted
             });
           });
@@ -2039,6 +2093,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
               x: pos.x,
               y: pos.y,
               priority,
+              priorityOrder: saved.priorityOrder || null,
               isCompleted
             });
           });
@@ -2281,6 +2336,17 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           const nextIdx = idx === -1 ? 0 : (idx + dir + list.length) % list.length;
           focusMapPinItem(list[nextIdx], true);
         };
+
+        const activeSearchFilterCount = computed(() => {
+          let count = 0;
+          if (filterBlock.value) count++;
+          if (selectedMembers.value.length > 0) count += selectedMembers.value.length;
+          if (filterItemTag.value) count++;
+          if (filterHasOshinagaki.value) count++;
+          if (filterRecentOnly.value) count++;
+          if (hideAbsent.value) count++;
+          return count;
+        });
 
         const resetAllFilters = () => {
           searchQuery.value = '';
@@ -2691,28 +2757,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         };
 
         // デフォルト初期アナウンス (Supabase未接続時やオフライン時の安全フォールバック)
-        const DEFAULT_NOTIFICATIONS = [
-          {
-            id: 'default_welcome_vggc12th',
-            created_at: '2026-10-29T12:00:00Z',
-            title: 'VGGC 12th お買い物支援ツール 大型アップデート公開！',
-            body: '当日タイムスケジュール、お品書き拡大ピンチズーム、ぶいすぽ推し複数選択、完全オフライン耐障害性強化など新機能が多数追加されました！',
-            type: 'feature',
-            category: 'announcement',
-            is_pinned: true,
-            link_url: null
-          },
-          {
-            id: 'default_official_schedule',
-            created_at: '2026-10-29T11:00:00Z',
-            title: '【公式】11/14(土) 当日スケジュール案内',
-            body: '09:45 受付開始\n10:00 サークル入場/更衣室開場\n12:00 即売会開会（一般入場）\n15:30 即売会終了\n15:45 アフターイベント',
-            type: 'official',
-            category: 'official',
-            is_pinned: false,
-            link_url: null
-          }
-        ];
+        const DEFAULT_NOTIFICATIONS = EVENT_CONFIG.defaultNotifications;
 
         // Supabaseから通知を取得 (2.5秒タイムアウト保護付き)
         const fetchNotifications = async () => {
@@ -2845,13 +2890,13 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
 
           // ★ オフライン対策: キャッシュから即時データを復元 (SWR)
           try {
-            const cachedData = localStorage.getItem('vggc12th_data_cache');
+            const cachedData = localStorage.getItem(EVENT_CONFIG.storageKey('data_cache'));
             if (cachedData) {
               const parsed = JSON.parse(cachedData);
               if (parsed.circles && parsed.circles.length) circles.value = parsed.circles;
               if (parsed.blocks && parsed.blocks.length) blocks.value = parsed.blocks;
             }
-            const cachedExtra = localStorage.getItem('vggc12th_circle_info_cache');
+            const cachedExtra = localStorage.getItem(EVENT_CONFIG.storageKey('circle_info_cache'));
             if (cachedExtra) {
               circleExtraInfo.value = JSON.parse(cachedExtra);
             }
@@ -2912,7 +2957,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
               circles.value = data.circles;
               blocks.value = data.sort_order;
               try {
-                localStorage.setItem('vggc12th_data_cache', JSON.stringify({
+                localStorage.setItem(EVENT_CONFIG.storageKey('data_cache'), JSON.stringify({
                   circles: data.circles,
                   blocks: data.sort_order
                 }));
@@ -2951,7 +2996,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
                 });
                 circleExtraInfo.value = infoMap;
                 try {
-                  localStorage.setItem('vggc12th_circle_info_cache', JSON.stringify(infoMap));
+                  localStorage.setItem(EVENT_CONFIG.storageKey('circle_info_cache'), JSON.stringify(infoMap));
                 } catch (e) {}
               }
 
@@ -2974,7 +3019,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
                       updated_at: payload.new.updated_at || null
                     };
                     try {
-                      localStorage.setItem('vggc12th_circle_info_cache', JSON.stringify(circleExtraInfo.value));
+                      localStorage.setItem(EVENT_CONFIG.storageKey('circle_info_cache'), JSON.stringify(circleExtraInfo.value));
                     } catch (e) {}
                   }
                 })
@@ -3130,7 +3175,14 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           if (savedList.value[circleId]) {
             delete savedList.value[circleId];
           } else {
-            savedList.value[circleId] = { memo: '', bought: false, soldout: false, price: '', priority: '', forWho: '', selectedItems: [], itemQuantities: {} };
+            savedList.value[circleId] = { memo: '', bought: false, soldout: false, price: '', priority: '', priorityOrder: null, forWho: '', selectedItems: [], itemQuantities: {} };
+          }
+        };
+
+        const onPriorityChange = (circleId) => {
+          const item = savedList.value[circleId];
+          if (item && !item.priority) {
+            item.priorityOrder = null;
           }
         };
 
@@ -3172,12 +3224,12 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         };
 
         const shareToTwitter = () => {
-          let text = "🛒 ぶいごまVGGC12th 買い出しリスト\n\n";
+          let text = `🛒 ぶいごま${EVENT_CONFIG.name} 買い出しリスト\n\n`;
           text += `予算: ¥${totalPrice.value.toLocaleString()}\n`;
           if (spentPrice.value > 0) text += `購入済: ¥${spentPrice.value.toLocaleString()}\n`;
           if (soldoutSavings.value > 0) text += `完売浮き: ¥${soldoutSavings.value.toLocaleString()}\n`;
           text += `(全${savedCount.value}サークル中、${boughtCount.value}サークル購入済${soldoutCount.value > 0 ? ` / 完売: ${soldoutCount.value}` : ''})\n\n`;
-          text += "#VGGC12th\n";
+          text += `${EVENT_CONFIG.hashtag}\n`;
           if (listId.value && isPublic.value) {
             text += `\n${shareUrl.value}`;
           }
@@ -3186,7 +3238,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         };
 
         const exportToText = () => {
-          let text = "📝 買い物リスト (VGGC 12th)\n";
+          let text = `📝 買い物リスト (${EVENT_CONFIG.name})\n`;
           text += `合計予定額: ¥${totalPrice.value.toLocaleString()}`;
           if (soldoutSavings.value > 0) {
             text += ` (完売浮き: ¥${soldoutSavings.value.toLocaleString()})`;
@@ -3410,10 +3462,16 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           if (sortOrder.value === 'priority') {
             const weight = { 'S': 3, 'A': 2, 'B': 1, '': 0 };
             list.sort((a, b) => {
-              const wa = weight[savedList.value[a.circle_id].priority || ''];
-              const wb = weight[savedList.value[b.circle_id].priority || ''];
+              const aData = savedList.value[a.circle_id] || {};
+              const bData = savedList.value[b.circle_id] || {};
+              const wa = weight[aData.priority || ''];
+              const wb = weight[bData.priority || ''];
               if (wa !== wb) return wb - wa;
-              return 0; 
+              const oa = aData.priorityOrder ? Number(aData.priorityOrder) : Number.MAX_SAFE_INTEGER;
+              const ob = bData.priorityOrder ? Number(bData.priorityOrder) : Number.MAX_SAFE_INTEGER;
+              if (oa !== ob) return oa - ob;
+              if (a.space_sym !== b.space_sym) return (a.space_sym || '').localeCompare(b.space_sym || '');
+              return (parseInt(a.space_num) || 0) - (parseInt(b.space_num) || 0);
             });
           } else if (sortOrder.value === 'recent') {
             list.sort((a, b) => {
@@ -3518,25 +3576,31 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           return result;
         });
 
-        // ★ サークル参加モード解放判定 (Jamj__Otaku アカウント または register_data 行保持者)
+        const CIRCLE_MODE_STORAGE_KEY = EVENT_CONFIG.storageKey('circle_mode_unlocked');
+        const isUnlockedRegisterAccount = (email) => {
+          if (!email) return false;
+          const lower = email.toLowerCase();
+          return EVENT_CONFIG.register.unlockedEmailPrefixes.some(prefix => lower.startsWith(prefix));
+        };
+
+        // ★ サークル参加モード解放判定 (許可アカウント または register_data 行保持者)
         const isCircleModeEnabled = computed(() => {
           if (isReadOnly.value) return false;
           if (user.value && user.value.email) {
-            const emailLower = user.value.email.toLowerCase();
-            if (emailLower.startsWith('jamj__otaku@') || hasRegisterRowInCloud.value) {
+            if (isUnlockedRegisterAccount(user.value.email) || hasRegisterRowInCloud.value) {
               return true;
             }
           }
-          // 圏外リロード時でも直前にJamj__Otakuでログインしていれば解放を維持
-          if (!isOnline.value && localStorage.getItem('vggc12th_circle_mode_unlocked') === 'true') {
+          // 圏外リロード時でも直前に許可アカウントでログインしていれば解放を維持
+          if (!isOnline.value && localStorage.getItem(CIRCLE_MODE_STORAGE_KEY) === 'true') {
             return true;
           }
           return false;
         });
 
         watch(user, async (u) => {
-          if (u && u.email && u.email.toLowerCase().startsWith('jamj__otaku@')) {
-            try { localStorage.setItem('vggc12th_circle_mode_unlocked', 'true'); } catch (e) {}
+          if (u && isUnlockedRegisterAccount(u.email)) {
+            try { localStorage.setItem(CIRCLE_MODE_STORAGE_KEY, 'true'); } catch (e) {}
           } else if (u && isOnline.value) {
             try {
               const { data } = await supabaseClient
@@ -3546,19 +3610,20 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
                 .maybeSingle();
               if (data && data.circle_id) {
                 hasRegisterRowInCloud.value = true;
-                try { localStorage.setItem('vggc12th_circle_mode_unlocked', 'true'); } catch (e) {}
+                try { localStorage.setItem(CIRCLE_MODE_STORAGE_KEY, 'true'); } catch (e) {}
               }
             } catch (e) {}
           }
         }, { immediate: true });
 
         const registerCircle = computed(() => {
+          const [fallbackSym, ...fallbackNumParts] = EVENT_CONFIG.register.defaultCircleSpace.split('-');
           return circles.value.find(c => c.circle_id === REGISTER_CIRCLE_ID) || {
             circle_id: REGISTER_CIRCLE_ID,
-            circle_name: 'Black Stance',
-            space_sym: 'M',
-            space_num: '15-16',
-            penname: 'BLΔCK'
+            circle_name: EVENT_CONFIG.register.defaultCircleName,
+            space_sym: fallbackSym || 'M',
+            space_num: fallbackNumParts.join('-') || '15-16',
+            penname: ''
           };
         });
 
@@ -3593,7 +3658,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           freeMemoText.value = '';
           timelineEvents.value = [];
           hasRegisterRowInCloud.value = false;
-          try { localStorage.removeItem('vggc12th_circle_mode_unlocked'); } catch (e) {}
+          try { localStorage.removeItem(CIRCLE_MODE_STORAGE_KEY); } catch (e) {}
           if (activeTab.value === 'register') activeTab.value = 'search';
         };
         const exitReadOnly = () => { const url = new URL(window.location.href); url.searchParams.delete('list'); window.location.href = url.toString(); };

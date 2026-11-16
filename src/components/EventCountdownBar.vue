@@ -44,65 +44,29 @@
     >
       <div class="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
         <span class="font-bold text-gray-800 flex items-center gap-1.5">
-          <span>🗓️ 11/14(土) 当日タイムテーブル</span>
+          <span>🗓️ {{ EVENT_CONFIG.dateLabel }} 当日タイムテーブル</span>
         </span>
-        <span class="text-[10px] text-gray-500">TRC第一展示場 (A-Dホール)</span>
+        <span class="text-[10px] text-gray-500">{{ EVENT_CONFIG.venue }}</span>
       </div>
 
       <ul class="space-y-1.5">
-        <li 
-          class="flex items-center justify-between p-2 rounded-xl transition border" 
-          :class="isCurrentSchedule('9:45') ? 'bg-blue-50 border-blue-200 font-bold' : 'bg-gray-50/50 border-gray-100'"
+        <li
+          v-for="slot in EVENT_CONFIG.timetable"
+          :key="slot.key"
+          class="flex items-center justify-between p-2 rounded-xl transition border"
+          :class="slotRowClass(slot)"
         >
           <div class="flex items-center gap-2">
-            <span class="w-14 font-mono font-bold text-gray-700">09:45-</span>
-            <span class="text-gray-800">一般参加者受付開始</span>
+            <span class="w-14 font-mono font-bold" :class="slotTimeClass(slot)">{{ slot.displayTime }}</span>
+            <span :class="slotTitleClass(slot)">{{ slot.label }}</span>
           </div>
-          <span v-if="isCurrentSchedule('9:45')" class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">NOW</span>
-        </li>
-
-        <li 
-          class="flex items-center justify-between p-2 rounded-xl transition border" 
-          :class="isCurrentSchedule('10:00') ? 'bg-blue-50 border-blue-200 font-bold' : 'bg-gray-50/50 border-gray-100'"
-        >
-          <div class="flex items-center gap-2">
-            <span class="w-14 font-mono font-bold text-gray-700">10:00-</span>
-            <span class="text-gray-800">サークル入場 (11:40迄) / 更衣室開場</span>
-          </div>
-          <span v-if="isCurrentSchedule('10:00')" class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">NOW</span>
-        </li>
-
-        <li 
-          class="flex items-center justify-between p-2 rounded-xl transition border" 
-          :class="isCurrentSchedule('12:00') ? 'bg-pink-50 border-pink-300 ring-2 ring-pink-400 font-bold' : 'bg-blue-50/30 border-blue-100'"
-        >
-          <div class="flex items-center gap-2">
-            <span class="w-14 font-mono font-bold text-blue-600">12:00</span>
-            <span class="text-blue-800 font-bold">即売会開会（一般入場開始）</span>
-          </div>
-          <span v-if="isCurrentSchedule('12:00')" class="text-[10px] bg-pink-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">開催中🔥</span>
-        </li>
-
-        <li 
-          class="flex items-center justify-between p-2 rounded-xl transition border" 
-          :class="isCurrentSchedule('15:30') ? 'bg-red-50 border-red-200 font-bold' : 'bg-gray-50/50 border-gray-100'"
-        >
-          <div class="flex items-center gap-2">
-            <span class="w-14 font-mono font-bold text-red-500">15:30</span>
-            <span class="text-red-700 font-bold">即売会終了</span>
-          </div>
-          <span v-if="isCurrentSchedule('15:30')" class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-bold">終了</span>
-        </li>
-
-        <li 
-          class="flex items-center justify-between p-2 rounded-xl transition border" 
-          :class="isCurrentSchedule('15:45') ? 'bg-blue-50 border-blue-200 font-bold' : 'bg-gray-50/50 border-gray-100'"
-        >
-          <div class="flex items-center gap-2">
-            <span class="w-14 font-mono font-bold text-gray-700">15:45-</span>
-            <span class="text-gray-800">アフターイベント (17:00完全撤収)</span>
-          </div>
-          <span v-if="isCurrentSchedule('15:45')" class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">NOW</span>
+          <span
+            v-if="isCurrentSchedule(slot.key)"
+            class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+            :class="slotBadgeClass(slot)"
+          >
+            {{ slot.highlight === 'open' ? '開催中🔥' : slot.highlight === 'close' ? '終了' : 'NOW' }}
+          </span>
         </li>
       </ul>
     </div>
@@ -111,6 +75,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
   countdown: {
@@ -128,6 +93,35 @@ const isExpanded = ref(false);
 
 const toggleExpand = () => {
   isExpanded.value = !isExpanded.value;
+};
+
+const slotRowClass = (slot) => {
+  const active = props.isCurrentSchedule(slot.key);
+  if (slot.highlight === 'open') {
+    return active ? 'bg-pink-50 border-pink-300 ring-2 ring-pink-400 font-bold' : 'bg-blue-50/30 border-blue-100';
+  }
+  if (slot.highlight === 'close') {
+    return active ? 'bg-red-50 border-red-200 font-bold' : 'bg-gray-50/50 border-gray-100';
+  }
+  return active ? 'bg-blue-50 border-blue-200 font-bold' : 'bg-gray-50/50 border-gray-100';
+};
+
+const slotTimeClass = (slot) => {
+  if (slot.highlight === 'open') return 'text-blue-600';
+  if (slot.highlight === 'close') return 'text-red-500';
+  return 'text-gray-700';
+};
+
+const slotTitleClass = (slot) => {
+  if (slot.highlight === 'open') return 'text-blue-800 font-bold';
+  if (slot.highlight === 'close') return 'text-red-700 font-bold';
+  return 'text-gray-800';
+};
+
+const slotBadgeClass = (slot) => {
+  if (slot.highlight === 'open') return 'bg-pink-500 text-white animate-pulse';
+  if (slot.highlight === 'close') return 'bg-red-600 text-white';
+  return 'bg-blue-600 text-white animate-pulse';
 };
 
 // バナーの背景グラデーションスタイル

@@ -1059,6 +1059,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { supabaseClient } from '../supabase';
+import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
   circle: {
@@ -1079,7 +1080,7 @@ const props = defineProps({
   },
   circleId: {
     type: String,
-    default: '10ebdde686d91dfe1ab4a63376c7b377' // M-15-16 Black Stance
+    default: EVENT_CONFIG.register.defaultCircleId
   }
 });
 
@@ -1135,7 +1136,7 @@ let feedbackTimer = null;
 let cloudSyncTimer = null;
 
 // ローカルストレージキー
-const localStorageKey = computed(() => `vggc12th_register_state_${props.circleId}`);
+const localStorageKey = computed(() => EVENT_CONFIG.storageKey(`register_state_${props.circleId}`));
 
 // =========================================================
 // 担当マスタ & 商品名末尾括弧からの自動抽出ヘルパー
@@ -1253,12 +1254,12 @@ const newCustomItem = ref({
 });
 
 // サークル表示名・スペース番号
-const circleName = computed(() => props.circle?.circle_name || 'Black Stance');
+const circleName = computed(() => props.circle?.circle_name || EVENT_CONFIG.register.defaultCircleName);
 const circleSpaceLabel = computed(() => {
   if (props.circle?.space_sym && props.circle?.space_num) {
     return `${props.circle.space_sym}-${props.circle.space_num}`;
   }
-  return 'M-15-16';
+  return EVENT_CONFIG.register.defaultCircleSpace;
 });
 
 // 1. circle_info.items (基本商品) と customItems (当日個人追加商品) を統合した全商品リスト

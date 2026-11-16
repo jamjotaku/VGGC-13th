@@ -103,6 +103,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { calculateReceiptSummary, generateReceiptShareText } from '../domain/receipt/receiptCalculator.js';
 import { drawReceiptToCanvas } from '../utils/receiptCanvasDrawer.js';
+import { EVENT_CONFIG } from '../eventConfig.js';
 
 const props = defineProps({
   isOpen: {
@@ -174,7 +175,7 @@ const downloadImage = () => {
 
   const a = document.createElement('a');
   a.href = receiptDataUrl.value;
-  a.download = `VGGC12th_receipt_${Date.now()}.png`;
+  a.download = `${EVENT_CONFIG.slug}_receipt_${Date.now()}.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -187,13 +188,13 @@ const shareNativeFile = async () => {
   try {
     receiptCanvasRef.value.toBlob(async (blob) => {
       if (!blob) return;
-      const file = new File([blob], `VGGC12th_receipt_${Date.now()}.png`, { type: 'image/png' });
+      const file = new File([blob], `${EVENT_CONFIG.slug}_receipt_${Date.now()}.png`, { type: 'image/png' });
       const text = generateReceiptShareText(summary.value);
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: 'VGGC 12th 戦利品レシート',
+          title: `${EVENT_CONFIG.name} 戦利品レシート`,
           text
         });
       } else {

@@ -1,4 +1,5 @@
 // src/utils/receiptCanvasDrawer.js
+import { EVENT_CONFIG } from '../eventConfig.js';
 
 /**
  * HTML5 Canvas 2D を使用して、戦利品レシート画像を高解像度でレンダリングする描画エンジン
@@ -49,7 +50,7 @@ export function drawReceiptToCanvas(canvas, summary) {
 
   // ロゴ・タイトル
   ctx.font = '900 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText('VGGC 12th', baseWidth / 2, 42);
+  ctx.fillText(EVENT_CONFIG.name, baseWidth / 2, 42);
 
   ctx.font = '700 13px -apple-system, BlinkMacSystemFont, sans-serif';
   ctx.fillStyle = '#64748b';
@@ -58,7 +59,7 @@ export function drawReceiptToCanvas(canvas, summary) {
   ctx.font = '500 11px monospace';
   ctx.fillStyle = '#94a3b8';
   ctx.fillText(`NO: ${summary.receiptNo}   DATE: ${summary.issuedAt}`, baseWidth / 2, 82);
-  ctx.fillText('PLACE: 東京流通センター (TRC) 第一展示場', baseWidth / 2, 98);
+  ctx.fillText(`PLACE: ${EVENT_CONFIG.venueFull}`, baseWidth / 2, 98);
 
   // 区切り点線
   drawDashedLine(ctx, 30, 115, baseWidth - 30, 115);
@@ -173,11 +174,11 @@ export function drawReceiptToCanvas(canvas, summary) {
   ctx.textAlign = 'center';
   ctx.font = '700 11px -apple-system, BlinkMacSystemFont, sans-serif';
   ctx.fillStyle = '#475569';
-  ctx.fillText('THANK YOU FOR VISITING VGGC 12th!', baseWidth / 2, currentY);
+  ctx.fillText(`THANK YOU FOR VISITING ${EVENT_CONFIG.name}!`, baseWidth / 2, currentY);
 
   ctx.font = '500 10px monospace';
   ctx.fillStyle = '#94a3b8';
-  ctx.fillText('https://vggc-12th.vercel.app/ #VGGC戦利品', baseWidth / 2, currentY + 16);
+  ctx.fillText(`${EVENT_CONFIG.siteUrl} #VGGC戦利品`, baseWidth / 2, currentY + 16);
 
   // 7. 下部ミシン目ギザギザ
   drawZigzagEdge(ctx, 0, baseHeight - 8, baseWidth, 8, false);

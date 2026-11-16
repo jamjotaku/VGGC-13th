@@ -54,7 +54,7 @@
       <div class="flex items-center gap-1.5 min-w-0">
         <span class="text-sm shrink-0">📅</span>
         <span class="text-xs font-bold text-slate-700 truncate">
-          事前計画モード（11/14 当日にリアルタイム時間連動）
+          事前計画モード（{{ EVENT_CONFIG.dateShort }} 当日にリアルタイム時間連動）
         </span>
       </div>
       <span class="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full shrink-0">
@@ -410,6 +410,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { EVENT_INFO } from '../constants';
+import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
   timelineEvents: {
@@ -452,49 +453,15 @@ const QUICK_TAGS = [
   { label: '🍙 昼食・休憩', category: 'other', title: '昼食・休憩' }
 ];
 
-// 公式スケジュールテンプレート (VGGC 12th 11/14(土) 当日タイムテーブル完全一致)
-const OFFICIAL_PRESETS = [
-  {
-    time: '09:45',
-    endTime: '',
-    category: 'official',
-    title: '一般参加者受付開始',
-    location: 'TRC第一展示場 (A-Dホール)',
-    memo: ''
-  },
-  {
-    time: '10:00',
-    endTime: '11:40',
-    category: 'official',
-    title: 'サークル入場 (11:40迄) / 更衣室開場',
-    location: 'TRC第一展示場 (A-Dホール)',
-    memo: 'サークル入場締切: 11:40 / 更衣室開場'
-  },
-  {
-    time: '12:00',
-    endTime: '',
-    category: 'official',
-    title: '即売会開会（一般入場開始）',
-    location: 'TRC第一展示場 (A-Dホール)',
-    memo: '即売会開会'
-  },
-  {
-    time: '15:30',
-    endTime: '',
-    category: 'official',
-    title: '即売会終了',
-    location: 'TRC第一展示場 (A-Dホール)',
-    memo: '一般頒布終了'
-  },
-  {
-    time: '15:45',
-    endTime: '17:00',
-    category: 'official',
-    title: 'アフターイベント (17:00完全撤収)',
-    location: 'TRC第一展示場 (A-Dホール)',
-    memo: '17:00完全撤収'
-  }
-];
+// 公式スケジュールテンプレート (EVENT_CONFIG.timetable と完全同期)
+const OFFICIAL_PRESETS = EVENT_CONFIG.timetable.map(slot => ({
+  time: slot.time,
+  endTime: slot.endTime || '',
+  category: 'official',
+  title: slot.title,
+  location: EVENT_CONFIG.venue,
+  memo: slot.memo || ''
+}));
 
 // =========================================
 // 現在時刻のリアルタイム連動
@@ -818,7 +785,7 @@ const addOfficialPresets = () => {
 const copyTimelineText = async () => {
   if (sortedEvents.value.length === 0) return;
 
-  const lines = ['【VGGC 12th 私の当日タイムスケジュール】'];
+  const lines = [`【${EVENT_CONFIG.name} 私の当日タイムスケジュール】`];
   sortedEvents.value.forEach(evt => {
     const timeRange = evt.endTime ? `${evt.time}〜${evt.endTime}` : evt.time;
     const cat = getCategoryMeta(evt.category);
@@ -831,7 +798,7 @@ const copyTimelineText = async () => {
     }
     lines.push(line);
   });
-  lines.push('#VGGC12th #ぶいすぽ');
+  lines.push(`${EVENT_CONFIG.hashtag} #ぶいすぽ`);
 
   const text = lines.join('\n');
   try {

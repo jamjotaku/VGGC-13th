@@ -1,7 +1,8 @@
 /**
- * VGGC 12th: タイムライン予定 当日通知 & リマインダーエンジン
- * 11/14(土) 当日の時刻と連動し、予定開始10分前や開始時刻に自動リマインド通知を生成します。
+ * タイムライン予定 当日通知 & リマインダーエンジン
+ * イベント当日の時刻と連動し、予定開始10分前や開始時刻に自動リマインド通知を生成します。
  */
+import { EVENT_CONFIG } from '../eventConfig';
 
 // 重複通知管理用 LocalStorage キー ＆ インメモリフォールバック
 const STORAGE_NOTIFIED_KEYS = 'vggc_timeline_notified_keys';
@@ -50,11 +51,12 @@ export function checkUpcomingTimelineReminders(timelineEvents, circles = [], sim
 
   const now = simulatedDate || new Date();
   
-  // VGGC 12th 当日（2026年11月14日）判定 (simulatedDate指定時はスキップ)
+  // イベント当日判定 (simulatedDate指定時はスキップ)
+  const [eventYear, eventMonth, eventDay] = EVENT_CONFIG.date.split('-').map(Number);
   const isEventDay = simulatedDate ? true : (
-    now.getFullYear() === 2026 && 
-    now.getMonth() === 10 && // 11月 (0-indexed: 10)
-    now.getDate() === 14
+    now.getFullYear() === eventYear &&
+    now.getMonth() === (eventMonth - 1) &&
+    now.getDate() === eventDay
   );
 
   // 当日以外、かつシミュレーション指定がない場合は通常のリマインダーは生成しない

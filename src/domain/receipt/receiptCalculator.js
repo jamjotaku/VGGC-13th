@@ -1,4 +1,5 @@
 // src/domain/receipt/receiptCalculator.js
+import { EVENT_CONFIG } from '../../eventConfig.js';
 
 /**
  * 買い物リストとサークルマスターデータから戦利品レシート明細・集計データを計算する純粋関数
@@ -52,7 +53,7 @@ export function calculateReceiptSummary(savedList = {}, circles = []) {
 
   // レシート番号（日付 + ランダム4桁）
   const randNum = Math.floor(1000 + Math.random() * 9000);
-  const receiptNo = `VGGC-1114-${randNum}`;
+  const receiptNo = `VGGC-${EVENT_CONFIG.dateCode}-${randNum}`;
 
   // 予算との差額
   const budgetDiff = budget > 0 ? (totalSpent - budget) : 0;
@@ -84,7 +85,7 @@ export function calculateReceiptSummary(savedList = {}, circles = []) {
  */
 export function generateReceiptShareText(summary) {
   const lines = [
-    `🏆 本日のVGGC 12th 戦利品レシート！`,
+    `🏆 本日の${EVENT_CONFIG.name} 戦利品レシート！`,
     `【合計】¥${summary.totalSpent.toLocaleString()} (${summary.itemCount}サークル制覇)`
   ];
 
@@ -97,8 +98,8 @@ export function generateReceiptShareText(summary) {
   }
 
   lines.push('');
-  lines.push('#VGGC12th #VGGC戦利品 #ぶいすぽ');
-  lines.push('https://vggc-12th.vercel.app/');
+  lines.push(`${EVENT_CONFIG.hashtag} #VGGC戦利品 #ぶいすぽ`);
+  lines.push(EVENT_CONFIG.siteUrl);
 
   return lines.join('\n');
 }

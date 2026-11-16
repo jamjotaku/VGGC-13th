@@ -50,7 +50,7 @@ const allCirclePins = appData.circles.map(c => {
 });
 
 // 3. サンプル巡回ルート検証 (Sが東端 C-14、Aが西ブロック群の反例ケース)
-const makePin = (spaceKey, priority) => {
+const makePin = (spaceKey, priority, priorityOrder = null) => {
   const [sym, num] = spaceKey.split('-');
   const pos = mapCoords[spaceKey];
   return {
@@ -62,6 +62,7 @@ const makePin = (spaceKey, priority) => {
     x: pos.x,
     y: pos.y,
     priority,
+    priorityOrder,
     isCompleted: false
   };
 };
@@ -121,6 +122,26 @@ for (let i = 0; i < pts.length - 1; i++) {
 console.log(`[3] 生成ルートポリライン×552ブースセル交差数: ${routeCellHits} (期待値: 0)`);
 if (routeCellHits !== 0) {
   console.error('❌ 生成されたルートがブースセルと交差しています');
+  process.exit(1);
+}
+
+// 5. 優先度内番号指定 (priorityOrder) の検証
+const numberedPins = [
+  makePin('C-14', 'S', 2),
+  makePin('N-05', 'S', 1),
+  makePin('M-37', 'S', null),
+  makePin('L-12', 'A', null),
+  makePin('K-28', 'A', 1)
+];
+const numberedRoute = calculatePatrolRoute(routeData, numberedPins, {
+  orderMode: 'priority',
+  returnToEntrance: false
+});
+const numberedSpaces = numberedRoute.orderedStops.map(s => s.spaceLabel);
+const expectedOrder = ['N-05', 'C-14', 'M-37', 'K-28', 'L-12'];
+console.log(`[4] 優先度内番号指定テスト: ${numberedSpaces.join(' -> ')}`);
+if (JSON.stringify(numberedSpaces) !== JSON.stringify(expectedOrder)) {
+  console.error(`❌ 優先度内番号指定の巡回順が不一致です。期待: ${expectedOrder.join(' -> ')}, 実際: ${numberedSpaces.join(' -> ')}`);
   process.exit(1);
 }
 

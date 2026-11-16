@@ -198,6 +198,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
   isOpen: {
@@ -232,7 +233,7 @@ const requestNotificationPermission = async () => {
     const perm = await Notification.requestPermission();
     notificationPermission.value = perm;
     if (perm === 'granted') {
-      new Notification('VGGC 12th', {
+      new Notification(EVENT_CONFIG.name, {
         body: '通知が有効になりました！当日のタイムスケジュール開始前にお知らせします。',
         icon: '/icons/icon-192.png'
       });

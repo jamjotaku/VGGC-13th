@@ -568,7 +568,9 @@ export function calculatePatrolRoute(routeData, targetPins = [], options = {}) {
       returnToEntrance ? entranceNodeId : null
     );
   } else {
-    // デフォルト: 優先度順 (S -> A -> B -> 未設定) の大枠を守り、各優先度内を近傍法＋2-optで最短化
+    // デフォルト: 優先度順 (S -> A -> B -> 未設定) の大枠を守り、
+    // 同優先度内で priorityOrder (1, 2, 3...) が指定されているものは番号順を遵守し、残りを近傍法＋2-optで最短化
+    const ignorePriorityOrder = Boolean(options.ignorePriorityOrder);
     const tiers = ['S', 'A', 'B', ''];
     const nonEmptyTiers = tiers
       .map(prio => enrichedItems.filter(it => (it.priority || '') === prio))
@@ -577,15 +579,33 @@ export function calculatePatrolRoute(routeData, targetPins = [], options = {}) {
     let currentAnchorId = entranceNodeId;
     nonEmptyTiers.forEach((group, tierIdx) => {
       const isLastTier = tierIdx === nonEmptyTiers.length - 1;
-      const tierOrdered = solveGroupOrder(
-        group,
-        currentAnchorId,
-        distMatrix,
-        isLastTier && returnToEntrance ? entranceNodeId : null
-      );
-      orderedItems.push(...tierOrdered);
-      if (tierOrdered.length > 0) {
-        currentAnchorId = tierOrdered[tierOrdered.length - 1].accessNodeId;
+      const numberedGroup = ignorePriorityOrder
+        ? []
+        : group
+            .filter(it => {
+              const num = Number(it.priorityOrder);
+              return it.priorityOrder !== null && it.priorityOrder !== '' && Number.isFinite(num) && num > 0;
+            })
+            .sort((a, b) => Number(a.priorityOrder) - Number(b.priorityOrder));
+      const numberedIds = new Set(numberedGroup.map(it => it.circle_id));
+      const unnumberedGroup = group.filter(it => !numberedIds.has(it.circle_id));
+
+      if (numberedGroup.length > 0) {
+        orderedItems.push(...numberedGroup);
+        currentAnchorId = numberedGroup[numberedGroup.length - 1].accessNodeId;
+      }
+
+      if (unnumberedGroup.length > 0) {
+        const tierOrdered = solveGroupOrder(
+          unnumberedGroup,
+          currentAnchorId,
+          distMatrix,
+          isLastTier && returnToEntrance ? entranceNodeId : null
+        );
+        orderedItems.push(...tierOrdered);
+        if (tierOrdered.length > 0) {
+          currentAnchorId = tierOrdered[tierOrdered.length - 1].accessNodeId;
+        }
       }
     });
   }
