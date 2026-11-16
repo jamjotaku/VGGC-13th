@@ -28,8 +28,12 @@ export const getEventCountdown = (now = new Date()) => {
     const m = Math.floor((diffStart % (1000 * 60 * 60)) / (1000 * 60));
     return { status: 'today_before', text: `✨ 開会(${EVENT_CONFIG.startTime})まで あと${h}時間${m}分！`, badge: '本日開催' };
   }
-  // イベント前 (日数カウントダウン)
-  const days = Math.ceil(diffStart / (1000 * 60 * 60 * 24));
+  // イベント前 (JST暦日基準の日数カウントダウン)
+  const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const nowJstDay = Math.floor((now.getTime() + JST_OFFSET_MS) / MS_PER_DAY);
+  const targetJstDay = Math.floor((targetDayStart.getTime() + JST_OFFSET_MS) / MS_PER_DAY);
+  const days = Math.max(1, targetJstDay - nowJstDay);
   return { status: 'countdown', text: `🎉 ${EVENT_CONFIG.name} まで あと ${days}日`, badge: `あと${days}日` };
 };
 

@@ -5,6 +5,11 @@ import { registerSW } from 'virtual:pwa-register';
 let updateSWHandler = null;
 let swRegistration = null;
 let updateCheckTimer = null;
+let lastAutoCheckAttemptAt = 0;
+
+// CDNリクエスト節約のため定期ポーリングは20分間隔、復帰時等の自動チェックは3分クールダウン
+const AUTO_POLL_INTERVAL_MS = 20 * 60 * 1000;
+const AUTO_CHECK_COOLDOWN_MS = 3 * 60 * 1000;
 
 // 更新リスナー管理
 const listeners = new Set();
@@ -68,11 +73,11 @@ export function initPwaAutoUpdater() {
       console.log('[PWA] Service Worker 登録完了:', swUrl);
 
       if (registration) {
-        // 1. 定期更新チェック (60秒間隔でサーバー側の変更有無をポーリング)
+        // 1. 定期更新チェック (20分間隔でサーバー側の変更有無をポーリング)
         if (updateCheckTimer) clearInterval(updateCheckTimer);
         updateCheckTimer = setInterval(() => {
           checkForAppUpdate(false);
-        }, 60 * 1000);
+        }, AUTO_POLL_INTERVAL_MS);
 
         // 2. スマホでアプリ復帰時 (バックグラウンド -> フォアグラウンド) に即時更新チェック
         document.addEventListener('visibilitychange', () => {
@@ -101,6 +106,12 @@ export async function checkForAppUpdate(notifyUser = true) {
   if (!swRegistration || typeof navigator === 'undefined' || !navigator.onLine) {
     return false;
   }
+
+  const now = Date.now();
+  if (!notifyUser && now - lastAutoCheckAttemptAt < AUTO_CHECK_COOLDOWN_MS) {
+    return false;
+  }
+  lastAutoCheckAttemptAt = now;
 
   try {
     pwaState.isChecking = true;
