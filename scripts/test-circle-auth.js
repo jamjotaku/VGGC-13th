@@ -75,6 +75,7 @@ for (const token of [
 ]) {
   assert.ok(sql.includes(token), `Missing SQL definition: ${token}`);
 }
+assert.ok(!sql.includes('gen_random_bytes'), 'SQL should use built-in gen_random_uuid instead of gen_random_bytes');
 console.log('  ✅ [PASS] supabase/circle_auth.sql のテーブル・RLS・RPC 定義検証');
 
 // 7. ポストURL正規化 & oEmbed 検証テスト

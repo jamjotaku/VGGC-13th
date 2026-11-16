@@ -201,6 +201,7 @@ AS $$
 DECLARE
   v_uid uuid := auth.uid();
   v_is_owner boolean := false;
+  v_raw text := upper(replace(gen_random_uuid()::text, '-', ''));
   v_code text;
   v_expires_at timestamptz := now() + interval '7 days';
 BEGIN
@@ -220,9 +221,8 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'OWNER_PERMISSION_REQUIRED');
   END IF;
 
-  -- 既存の有効コードを無効化せず、新規コードを発行（8文字ランダム）
-  v_code := 'VC-' || upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 4))
-                 || '-' || upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 4));
+  -- 既存の有効コードを無効化せず、新規コードを発行（組み込み gen_random_uuid で8文字ランダム生成）
+  v_code := 'VC-' || substr(v_raw, 1, 4) || '-' || substr(v_raw, 5, 4);
 
   INSERT INTO public.circle_invite_codes (circle_id, code, created_by, max_uses, expires_at)
   VALUES (p_circle_id, v_code, v_uid, least(greatest(coalesce(p_max_uses, 5), 1), 20), v_expires_at);
