@@ -25,6 +25,11 @@
                 class="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
         </button>
 
+        <!-- サークル認証・売り子連携ボタン -->
+        <button v-if="!isReadOnly" @click="showCircleAuthModal = true" class="p-1 md:p-1.5 text-amber-600 hover:bg-amber-50 rounded-full transition cursor-pointer" title="サークル参加者認証・売り子連携">
+          <span class="text-base md:text-lg leading-none">🏪</span>
+        </button>
+
         <!-- ヘルプボタン -->
         <button @click="showHelpModal = true" class="p-1 md:p-1.5 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer" title="ヘルプ・免責事項">
           <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -46,7 +51,7 @@
         <template v-if="user && !isReadOnly">
           <div class="flex items-center gap-1.5 md:gap-3">
             <div class="flex items-center gap-1 bg-gray-50 border border-gray-100 px-1.5 md:px-2 py-1 rounded-md">
-              <span class="text-[10px] md:text-xs font-bold text-gray-600 max-w-[60px] md:max-w-[100px] truncate">{{ user.email.split('@')[0] }}</span>
+              <span class="text-[10px] md:text-xs font-bold text-gray-600 max-w-[60px] md:max-w-[100px] truncate">{{ userDisplayName }}</span>
               <span v-if="!isOnline" class="text-[10px] text-red-500 font-bold px-0.5" title="圏外（データは端末内に保存されています）">圏外</span>
               <template v-else>
                 <span v-if="isSaving" class="text-[10px] text-gray-400" title="保存中">
@@ -1705,7 +1710,7 @@
           :circle-extra="registerCircleExtra"
           :user="user"
           :is-online="isOnline"
-          :circle-id="REGISTER_CIRCLE_ID"
+          :circle-id="activeRegisterCircleId"
           @exit-register="exitRegisterMode"
         />
       </div>
@@ -1793,6 +1798,18 @@
     <!-- ログイン/登録モーダル -->
     <AuthModal :show="showAuthModal" :is-online="isOnline" @close="showAuthModal = false" />
 
+    <!-- サークル本人認証・売り子連携モーダル -->
+    <CircleAuthModal
+      :show="showCircleAuthModal"
+      :user="user"
+      :is-online="isOnline"
+      :circles="circles"
+      :memberships="circleMemberships"
+      @close="showCircleAuthModal = false"
+      @open-standard-auth="showCircleAuthModal = false; showAuthModal = true"
+      @memberships-updated="loadCircleMemberships(user?.id)"
+    />
+
     <!-- 共有モーダル -->
     <ShareModal :show="showShareModal" :is-public="isPublic" :share-url="shareUrl" @close="showShareModal = false" @toggle-public="onTogglePublic" />
   
@@ -1822,11 +1839,15 @@ import EventCountdownBar from './components/EventCountdownBar.vue';
 import NotificationModal from './components/NotificationModal.vue';
 import PwaUpdateToast from './components/PwaUpdateToast.vue';
 import CircleRegisterPanel from './components/CircleRegisterPanel.vue';
+import CircleAuthModal from './components/CircleAuthModal.vue';
+import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
 
-        // ★ サークル参加モード（簡易レジ v1）
+        // ★ サークル参加モード（簡易レジ v1 + 汎用サークル認証連携）
         const REGISTER_CIRCLE_ID = EVENT_CONFIG.register.defaultCircleId;
         const hasRegisterRowInCloud = ref(false);
+        const showCircleAuthModal = ref(false);
+        const circleMemberships = ref([]);
 
         const circles = ref([]);
         const blocks = ref([]);
@@ -3577,21 +3598,71 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         });
 
         const CIRCLE_MODE_STORAGE_KEY = EVENT_CONFIG.storageKey('circle_mode_unlocked');
+        const CIRCLE_MEMBERSHIPS_CACHE_KEY = EVENT_CONFIG.storageKey('circle_memberships_cache');
+
+        const userDisplayName = computed(() => {
+          if (!user.value) return '';
+          if (user.value.email) {
+            return user.value.email.split('@')[0];
+          }
+          const xHandle = extractXHandleFromUser(user.value);
+          return xHandle ? `@${xHandle}` : 'User';
+        });
+
         const isUnlockedRegisterAccount = (email) => {
           if (!email) return false;
           const lower = email.toLowerCase();
           return EVENT_CONFIG.register.unlockedEmailPrefixes.some(prefix => lower.startsWith(prefix));
         };
 
-        // ★ サークル参加モード解放判定 (許可アカウント または register_data 行保持者)
+        const loadCircleMemberships = async (uid) => {
+          if (!uid) {
+            circleMemberships.value = [];
+            return;
+          }
+          if (!isOnline.value) {
+            try {
+              const cached = localStorage.getItem(CIRCLE_MEMBERSHIPS_CACHE_KEY);
+              if (cached) circleMemberships.value = JSON.parse(cached);
+            } catch (e) {}
+            return;
+          }
+          try {
+            const { data, error } = await supabaseClient
+              .from('circle_memberships')
+              .select('*')
+              .eq('user_id', uid)
+              .is('revoked_at', null)
+              .order('verified_at', { ascending: false });
+            if (!error && Array.isArray(data)) {
+              circleMemberships.value = data;
+              try {
+                localStorage.setItem(CIRCLE_MEMBERSHIPS_CACHE_KEY, JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem(CIRCLE_MODE_STORAGE_KEY, 'true');
+              } catch (e) {}
+            }
+          } catch (e) {
+            // テーブル未作成環境等では既存互換動作にフォールバック
+          }
+        };
+
+        const activeRegisterCircleId = computed(() => {
+          if (circleMemberships.value.length > 0) {
+            return circleMemberships.value[0].circle_id;
+          }
+          return REGISTER_CIRCLE_ID;
+        });
+
+        // ★ サークル参加モード解放判定 (許可アカウント / register_data行保持者 / サークル認証済み)
         const isCircleModeEnabled = computed(() => {
           if (isReadOnly.value) return false;
+          if (circleMemberships.value.length > 0) return true;
           if (user.value && user.value.email) {
             if (isUnlockedRegisterAccount(user.value.email) || hasRegisterRowInCloud.value) {
               return true;
             }
           }
-          // 圏外リロード時でも直前に許可アカウントでログインしていれば解放を維持
+          // 圏外リロード時でも直前に許可アカウントまたは認証済みでログインしていれば解放を維持
           if (!isOnline.value && localStorage.getItem(CIRCLE_MODE_STORAGE_KEY) === 'true') {
             return true;
           }
@@ -3599,6 +3670,11 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         });
 
         watch(user, async (u) => {
+          if (u) {
+            await loadCircleMemberships(u.id);
+          } else {
+            circleMemberships.value = [];
+          }
           if (u && isUnlockedRegisterAccount(u.email)) {
             try { localStorage.setItem(CIRCLE_MODE_STORAGE_KEY, 'true'); } catch (e) {}
           } else if (u && isOnline.value) {
@@ -3617,9 +3693,10 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         }, { immediate: true });
 
         const registerCircle = computed(() => {
+          const targetId = activeRegisterCircleId.value;
           const [fallbackSym, ...fallbackNumParts] = EVENT_CONFIG.register.defaultCircleSpace.split('-');
-          return circles.value.find(c => c.circle_id === REGISTER_CIRCLE_ID) || {
-            circle_id: REGISTER_CIRCLE_ID,
+          return circles.value.find(c => c.circle_id === targetId) || {
+            circle_id: targetId,
             circle_name: EVENT_CONFIG.register.defaultCircleName,
             space_sym: fallbackSym || 'M',
             space_num: fallbackNumParts.join('-') || '15-16',
@@ -3628,7 +3705,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         });
 
         const registerCircleExtra = computed(() => {
-          return circleExtraInfo.value[REGISTER_CIRCLE_ID] || { items: [] };
+          return circleExtraInfo.value[activeRegisterCircleId.value] || { items: [] };
         });
 
         const onTogglePublic = async (newVal) => {
@@ -3658,7 +3735,11 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           freeMemoText.value = '';
           timelineEvents.value = [];
           hasRegisterRowInCloud.value = false;
-          try { localStorage.removeItem(CIRCLE_MODE_STORAGE_KEY); } catch (e) {}
+          circleMemberships.value = [];
+          try {
+            localStorage.removeItem(CIRCLE_MODE_STORAGE_KEY);
+            localStorage.removeItem(CIRCLE_MEMBERSHIPS_CACHE_KEY);
+          } catch (e) {}
           if (activeTab.value === 'register') activeTab.value = 'search';
         };
         const exitReadOnly = () => { const url = new URL(window.location.href); url.searchParams.delete('list'); window.location.href = url.toString(); };
