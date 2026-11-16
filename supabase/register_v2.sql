@@ -102,6 +102,12 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.circle_register_events;
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'circle_register_states'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.circle_register_states;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;

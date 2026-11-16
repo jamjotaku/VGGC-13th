@@ -2095,6 +2095,38 @@ const loadFromLocalCache = () => {
   return false;
 };
 
+// 共有マスタ (customItems / sellers / itemOverrides) を他端末と同期マージ
+const applySharedMasterState = (sData, fallbackUpdatedAt = null) => {
+  if (!sData || typeof sData !== 'object') return;
+  const cloudRev = Number(sData.revision) || 0;
+  const localRev = Number(registerState.value.revision) || 0;
+  const cloudCustom = Array.isArray(sData.customItems) ? sData.customItems : [];
+
+  if (!hasPendingSync.value && cloudRev >= localRev) {
+    registerState.value.revision = cloudRev;
+    registerState.value.updatedAt = sData.updatedAt || fallbackUpdatedAt || registerState.value.updatedAt;
+    registerState.value.sellers = normalizeLoadedSellers(sData.sellers);
+    registerState.value.itemOverrides = sData.itemOverrides || {};
+    registerState.value.customItems = cloudCustom;
+  } else {
+    // 両端末で未同期がある場合は当日追加商品と担当マスタを和集合マージ
+    const existingIds = new Set(registerState.value.customItems.map(c => c.id));
+    for (const item of cloudCustom) {
+      if (item && item.id && !existingIds.has(item.id)) {
+        registerState.value.customItems.push(item);
+      }
+    }
+    const mergedSellers = [...activeSellers.value];
+    for (const s of normalizeLoadedSellers(sData.sellers)) {
+      if (!mergedSellers.includes(s)) mergedSellers.push(s);
+    }
+    registerState.value.sellers = mergedSellers;
+  }
+  // 現在のトランザクション集計の soldCount を再適用して整合性を保つ
+  applyMergedTransactions(registerState.value.transactions);
+  saveToLocalCache();
+};
+
 // マージされたトランザクション一覧から全商品の soldCount を決定論的に再計算
 const applyMergedTransactions = (mergedTxs) => {
   registerState.value.transactions = mergedTxs;
@@ -2242,16 +2274,7 @@ const syncWithCloudOnInitOrOnline = async () => {
     ]);
 
     if (!v2StateRes.error && v2StateRes.data?.state_data) {
-      const sData = v2StateRes.data.state_data;
-      const cloudRev = Number(sData.revision) || 0;
-      const localRev = Number(registerState.value.revision) || 0;
-      if (cloudRev > localRev && !hasPendingSync.value) {
-        registerState.value.revision = cloudRev;
-        registerState.value.updatedAt = sData.updatedAt || v2StateRes.data.updated_at;
-        registerState.value.sellers = normalizeLoadedSellers(sData.sellers);
-        registerState.value.itemOverrides = sData.itemOverrides || {};
-        registerState.value.customItems = Array.isArray(sData.customItems) ? sData.customItems : [];
-      }
+      applySharedMasterState(v2StateRes.data.state_data, v2StateRes.data.updated_at);
     }
 
     if (!v2EventsRes.error && Array.isArray(v2EventsRes.data)) {
@@ -2349,7 +2372,7 @@ const subscribeRegisterRealtime = () => {
   if (!props.user || !props.isOnline || registerRealtimeChannel) return;
   try {
     registerRealtimeChannel = supabaseClient
-      .channel(`register_events:${props.circleId}`)
+      .channel(`register_v2:${props.circleId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'circle_register_events', filter: `circle_id=eq.${props.circleId}` },
@@ -2358,6 +2381,15 @@ const subscribeRegisterRealtime = () => {
             const merged = mergeTransactionsWithCloudEvents(registerState.value.transactions, [payload.new]);
             applyMergedTransactions(merged);
             saveToLocalCache();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'circle_register_states', filter: `circle_id=eq.${props.circleId}` },
+        (payload) => {
+          if (payload?.new?.state_data) {
+            applySharedMasterState(payload.new.state_data, payload.new.updated_at);
           }
         }
       )
