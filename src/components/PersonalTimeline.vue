@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
 // =========================================
 // イベント当日判定 ＆ リアルタイム時間連動
 // =========================================
-// イベント当日 (2026-11-14) かどうか判定
+// イベント当日かどうか判定
 const isEventDay = computed(() => {
   const d = now.value;
   const targetDayStart = new Date(EVENT_INFO.dayStart);

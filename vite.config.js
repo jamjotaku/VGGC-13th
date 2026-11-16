@@ -9,13 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
-        'favicon.ico',
-        'icons/icon.svg',
-        'data.json',
-        'map.jpg',
-        'map.pdf',
-        'map_coords.json',
-        'map_routes.json'
+        'map.pdf'
       ],
       manifest: {
         name: `${EVENT_CONFIG.name} サークルリスト＆マップ`,
@@ -41,7 +35,15 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,json}'],
-        globIgnores: ['**/admin.html', '**/simulator.html', '**/map_editor.html', '**/ogp*.png'],
+        globIgnores: [
+          '**/admin.html',
+          '**/simulator.html',
+          '**/map_editor.html',
+          '**/ogp*.png',
+          '**/vggc13th-icon-1024.png',
+          '**/assets/admin-*.js',
+          '**/assets/admin-*.css'
+        ],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB (data.json & map.jpg 対応)
         runtimeCaching: [
           // 1. サークルお品書き画像 / 外部CDN画像 (CacheFirst)

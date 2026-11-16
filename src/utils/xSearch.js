@@ -218,7 +218,7 @@ export const getCirclePublicSearchUrl = (circle) => {
 };
 
 /**
- * 会場全体（#VGGC12th）のカテゴリ別リアルタイム速報URLを生成
+ * 会場全体（EVENT_CONFIG.hashtag）のカテゴリ別リアルタイム速報URLを生成
  * @param {'soldout' | 'line' | 'all'} type 
  */
 export const getEventLiveSearchUrl = (type = 'all') => {
