@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VGGC 12th - 管理者ダッシュボード</title>
+  <title>VGGC 13th - 管理者ダッシュボード</title>
   
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <!-- Supabase -->
@@ -44,7 +44,7 @@
       <div>
         <div class="flex items-center gap-2.5 flex-wrap">
           <span class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            <span>🛡️ VGGC 12th</span>
+            <span>🛡️ VGGC 13th</span>
             <span class="text-xs font-bold bg-blue-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider">Admin v2.2 Pro</span>
           </span>
           <span class="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md font-mono hidden sm:inline-block">
@@ -66,6 +66,17 @@
           <span v-else>💾</span>
           <span>未保存 {{ unsavedSet.size }}件を一括保存</span>
           <span class="text-[10px] bg-slate-950/20 px-1 rounded font-mono">Ctrl+S</span>
+        </button>
+
+        <!-- 🔐 サークル個別認証申請パネル開閉ボタン -->
+        <button @click="showAuthRequestsPanel = !showAuthRequestsPanel"
+                class="text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold shadow-sm border cursor-pointer active:scale-95"
+                :class="showAuthRequestsPanel ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300'"
+                title="鍵垢サークル主などの個別認証申請を確認・承認します">
+          <span>🔐 認証申請</span>
+          <span v-if="pendingAuthRequestsCount > 0" class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-rose-500 text-white">
+            {{ pendingAuthRequestsCount }}
+          </span>
         </button>
 
         <!-- ★ BGMプレイヤー開閉ボタン -->
@@ -148,6 +159,61 @@
       </div>
       
       <div v-else class="space-y-4">
+
+        <!-- 🔐 サークル個別認証申請パネル (鍵垢・フォールバック受け皿) -->
+        <div v-if="showAuthRequestsPanel" class="bg-amber-50/60 border-2 border-amber-300 rounded-2xl p-4 shadow-sm space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 class="text-sm sm:text-base font-black text-amber-950 flex items-center gap-2">
+                <span>🔐 サークル個別認証申請（鍵垢・フォールバック受け皿）</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-mono">未対応 {{ pendingAuthRequestsCount }}件</span>
+              </h2>
+              <p class="text-xs text-amber-800 mt-0.5">アプリ内から送信された個別申請を確認し、「直接オーナー付与」または「VO-コード発行」で承認できます。</p>
+            </div>
+            <button @click="fetchAuthRequests" class="px-3 py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold cursor-pointer">
+              🔄 再読込
+            </button>
+          </div>
+
+          <div v-if="authRequests.length === 0" class="bg-white rounded-xl border border-amber-200 p-4 text-center text-xs text-slate-500">
+            現在、個別認証申請はありません。
+          </div>
+
+          <div v-else class="space-y-2 max-h-80 overflow-y-auto pr-1">
+            <div v-for="req in authRequests" :key="req.id"
+                 class="bg-white rounded-xl border p-3 flex flex-col md:flex-row md:items-center justify-between gap-3"
+                 :class="req.status === 'pending' ? 'border-amber-300' : 'border-slate-200 opacity-75'">
+              <div class="space-y-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-black font-mono"
+                        :class="req.status === 'pending' ? 'bg-rose-100 text-rose-800' : req.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'">
+                    {{ req.status === 'pending' ? '未対応' : req.status === 'approved' ? '承認済' : '却下' }}
+                  </span>
+                  <span class="font-mono font-black text-xs text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{{ req.request_code }}</span>
+                  <span class="font-extrabold text-xs text-blue-800">{{ getCircleDisplayById(req.circle_id) }}</span>
+                  <span class="font-mono text-xs text-slate-700 font-bold">@{{ req.x_handle }}</span>
+                </div>
+                <div v-if="req.note" class="text-xs text-slate-600">メモ: {{ req.note }}</div>
+                <div v-if="req.issued_code" class="text-xs font-mono font-black text-indigo-700">発行済コード: {{ req.issued_code }}</div>
+              </div>
+
+              <div v-if="req.status === 'pending'" class="flex items-center gap-1.5 shrink-0 flex-wrap">
+                <button @click="resolveAuthRequest(req.id, 'approve_direct')"
+                        class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold cursor-pointer">
+                  ✅ 直接オーナー付与
+                </button>
+                <button @click="resolveAuthRequest(req.id, 'approve_code')"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold cursor-pointer">
+                  🎟️ VO-コード発行
+                </button>
+                <button @click="resolveAuthRequest(req.id, 'reject')"
+                        class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold cursor-pointer">
+                  ✕ 却下
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
         
         <!-- 統計 ＆ 進捗サマリーカード (PC 4カラム) -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1790,6 +1856,7 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
           if (!email) return false;
           const lower = email.toLowerCase().trim();
           return (
+            lower === 'admin@vggc-13th.vercel.app' ||
             lower === 'admin@vggc.dummy.local' ||
             lower.includes('admin') ||
             lower.startsWith('jamj__otaku') ||
@@ -1799,9 +1866,53 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
 
         const normalizeEmail = (input) => {
           const raw = (input || '').trim();
-          if (!raw) return 'admin@vggc.dummy.local';
+          if (!raw) return 'admin@vggc-13th.vercel.app';
           if (raw.includes('@')) return raw;
-          return `${raw}@vggc.dummy.local`;
+          return `${raw}@vggc-13th.vercel.app`;
+        };
+
+        // 🔐 サークル個別認証申請（鍵垢・フォールバック受け皿）
+        const showAuthRequestsPanel = ref(false);
+        const authRequests = ref([]);
+        const pendingAuthRequestsCount = computed(() => authRequests.value.filter(r => r.status === 'pending').length);
+
+        const getCircleDisplayById = (cid) => {
+          const c = circles.value.find(item => item.circle_id === cid);
+          return c ? `${c.space_sym}-${c.space_num} ${c.circle_name}` : cid;
+        };
+
+        const fetchAuthRequests = async () => {
+          try {
+            const { data, error } = await supabaseClient
+              .from('circle_auth_requests')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (!error && Array.isArray(data)) {
+              authRequests.value = data;
+            }
+          } catch (e) {}
+        };
+
+        const resolveAuthRequest = async (reqId, action) => {
+          try {
+            const { data, error } = await supabaseClient.rpc('resolve_circle_auth_request', {
+              p_request_id: reqId,
+              p_action: action
+            });
+            if (error) throw error;
+            if (!data?.ok) throw new Error(data?.error || '処理に失敗しました');
+            if (data.issued_code) {
+              try { await navigator.clipboard.writeText(data.issued_code); } catch (e) {}
+              showToast(`VO-コードを発行＆コピーしました: ${data.issued_code}`, 'success');
+            } else if (action === 'approve_direct') {
+              showToast('申請者のアカウントへオーナー権限を直接付与しました！', 'success');
+            } else {
+              showToast('申請を却下しました', 'info');
+            }
+            await fetchAuthRequests();
+          } catch (err) {
+            showToast(err.message || '申請処理エラー', 'error');
+          }
         };
 
         onMounted(async () => {
@@ -2005,6 +2116,7 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
 
             // Supabaseから追加データを取得
             const { data: dbData, error } = await supabaseClient.from('circle_info').select('*');
+            await fetchAuthRequests();
             if (!error && dbData) {
               dbData.forEach(info => {
                 if (initialEditData[info.circle_id]) {
@@ -3061,7 +3173,10 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
           bgmUrlInput, bgmTitleInput, applyBgmUrlInput, addBgmBookmark, selectBgmBookmark, removeBgmBookmark,
           spotifyClientId, spotifyRedirectUri, spotifyAccessToken, spotifyUser, spotifyPlaylists, isLoadingSpotify,
           saveSpotifyClientId, copySpotifyRedirectUri, startSpotifyLogin, fetchSpotifyPlaylists,
-          playSpotifyPlaylist, bookmarkSpotifyPlaylist, logoutSpotify
+          playSpotifyPlaylist, bookmarkSpotifyPlaylist, logoutSpotify,
+          // 個別認証申請（鍵垢フォールバック受け皿）
+          showAuthRequestsPanel, authRequests, pendingAuthRequestsCount,
+          getCircleDisplayById, fetchAuthRequests, resolveAuthRequest
         };
       }
     }).mount('#app');

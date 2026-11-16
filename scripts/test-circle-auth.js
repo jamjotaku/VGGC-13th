@@ -50,15 +50,17 @@ assert.equal(extractXHandleFromUser(mockUser), 'samplecircle_x');
 assert.equal(extractXHandleFromUser({ id: 'u2', identities: [] }), '');
 console.log('  ✅ [PASS] Supabase Auth ユーザーからの X ハンドル抽出');
 
-// 4. 売り子招待コード正規化・バリデーション
+// 4. 招待コード正規化・バリデーション（VC-: 売り子 / VO-: オーナー）
 assert.equal(normalizeInviteCode(' vc-a1b2-c3d4 '), 'VC-A1B2-C3D4');
+assert.equal(normalizeInviteCode(' vo-9f8e-7d6c '), 'VO-9F8E-7D6C');
 assert.equal(normalizeInviteCode('VC-123-456'), '');
 assert.equal(normalizeInviteCode('INVALID'), '');
-console.log('  ✅ [PASS] 売り子用招待コード形式チェック（VC-XXXX-XXXX）');
+console.log('  ✅ [PASS] 招待コード形式チェック（VC- / VO-）');
 
 // 5. 認証方式ラベル
 assert.equal(getAuthMethodLabel('x_oauth'), 'X (Twitter) 本人確認');
 assert.equal(getAuthMethodLabel('staff_invite_code'), '売り子招待コード');
+assert.equal(getAuthMethodLabel('owner_invite_code'), 'オーナー招待コード');
 console.log('  ✅ [PASS] 監査ログ用認証方式ラベル');
 
 // 6. Supabase SQL スキーマ・RPC・RLS 存在確認
@@ -67,11 +69,14 @@ const sql = fs.readFileSync(sqlPath, 'utf8');
 for (const token of [
   'CREATE TABLE IF NOT EXISTS public.circle_memberships',
   'CREATE TABLE IF NOT EXISTS public.circle_invite_codes',
+  'CREATE TABLE IF NOT EXISTS public.circle_auth_requests',
   'ENABLE ROW LEVEL SECURITY',
   'verify_circle_owner_by_x',
   'create_staff_invite_code',
   'redeem_staff_invite_code',
-  'revoke_my_circle_membership'
+  'revoke_my_circle_membership',
+  'submit_circle_auth_request',
+  'resolve_circle_auth_request'
 ]) {
   assert.ok(sql.includes(token), `Missing SQL definition: ${token}`);
 }

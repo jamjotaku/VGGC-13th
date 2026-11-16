@@ -58,13 +58,13 @@ export function extractXHandleFromUser(user) {
 }
 
 /**
- * 売り子用招待コードの形式チェック（例: VC-A1B2-C3D4）
+ * 招待コードの形式チェック（VC-XXXX-XXXX: 売り子用 / VO-XXXX-XXXX: オーナー用）
  * @param {string} code
  * @returns {string} 正規化済みコード（無効なら空文字）
  */
 export function normalizeInviteCode(code) {
   const s = String(code || '').trim().toUpperCase();
-  if (/^VC-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(s)) {
+  if (/^(VC|VO)-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(s)) {
     return s;
   }
   return '';
@@ -81,10 +81,12 @@ export function getAuthMethodLabel(authMethod) {
       return 'X (Twitter) 本人確認';
     case 'staff_invite_code':
       return '売り子招待コード';
+    case 'owner_invite_code':
+      return 'オーナー招待コード';
     case 'post_url':
       return 'X 公開ポスト確認';
     case 'admin_manual':
-      return '運営手動紐付け';
+      return '運営承認付与';
     default:
       return '未確認';
   }

@@ -8,6 +8,7 @@ export const EVENT_CONFIG = {
   shortName: 'VGGC 13th',
   slug: 'vggc13th',
   dummyEmailDomain: 'vggc-13th.vercel.app',
+  adminContactX: '', // アプリ管理用 X アカウント作成後に '@...' を設定
   hashtag: '#VGGC13th',
   siteUrl: 'https://vggc-13th.vercel.app/',
   title: 'VGGC 13th サークルリスト & 会場マップ',

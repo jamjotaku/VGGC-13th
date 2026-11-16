@@ -206,17 +206,55 @@
                         class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs md:text-sm font-extrabold shadow-sm cursor-pointer transition">
                   {{ isProcessing ? '公開ポストを確認中...' : 'ポストURLで本人確認を実行' }}
                 </button>
+
+                <!-- 認証の保険：鍵垢・ポスト不可向け 個別申請アコーディオン -->
+                <div class="pt-2 border-t border-gray-200">
+                  <button type="button"
+                          @click="showFallbackRequest = !showFallbackRequest"
+                          class="w-full text-left text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-between py-1 cursor-pointer">
+                    <span>🔒 非公開（鍵）アカウント・公開ポストが難しい方はこちら</span>
+                    <span>{{ showFallbackRequest ? '▲' : '▼' }}</span>
+                  </button>
+
+                  <div v-if="showFallbackRequest" class="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <p class="text-[11px] text-slate-600 leading-relaxed">
+                      鍵垢などで公開ポスト認証ができない場合は、運営側で個別確認のうえ認証します。上の「Step 2」でサークルを選択し、連絡可能な X ID を入力して申請してください。
+                    </p>
+                    <input type="text"
+                           v-model="fallbackXHandle"
+                           placeholder="あなたの X ID (例: @your_circle_x)"
+                           class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-slate-400">
+                    <input type="text"
+                           v-model="fallbackNote"
+                           placeholder="補足メモ（任意：鍵垢のため、別名義など）"
+                           class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-slate-400">
+                    <button type="button"
+                            @click="submitFallbackRequest"
+                            :disabled="!isOnline || isProcessing || !selectedCircleId || !fallbackXHandle.trim()"
+                            class="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:bg-gray-300 text-white text-xs font-extrabold cursor-pointer transition">
+                      個別認証を申請する
+                    </button>
+
+                    <div v-if="submittedRequestCode" class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 space-y-1">
+                      <div class="font-extrabold">✅ 申請を受け付けました！</div>
+                      <div>受付番号: <span class="font-mono font-black text-sm">{{ submittedRequestCode }}</span></div>
+                      <p class="text-emerald-800">
+                        なりすまし防止のため、本人確認として運営 X<span v-if="EVENT_CONFIG.adminContactX">（{{ EVENT_CONFIG.adminContactX }}）</span>へ上記の受付番号をご連絡ください。確認後、自動でレジ権限が付与されます。
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <!-- タブB：売り子招待コードで参加 -->
+              <!-- タブB：招待コードで参加 (売り子 VC- / オーナー VO-) -->
               <div v-else class="space-y-3">
                 <p class="text-xs text-gray-600 leading-relaxed">
-                  サークル主が発行した招待コード（例：<span class="font-mono font-bold">VC-A1B2-C3D4</span>）を入力すると、即座に売り子としてレジ機能を利用できます。
+                  サークル主から受け取った売り子コード（<span class="font-mono font-bold">VC-...</span>）または運営発行のオーナーコード（<span class="font-mono font-bold">VO-...</span>）を入力してください。
                 </p>
                 <div class="flex gap-2">
                   <input type="text"
                          v-model="inviteCodeInput"
-                         placeholder="VC-XXXX-XXXX"
+                         placeholder="VC-XXXX-XXXX / VO-XXXX-XXXX"
                          class="flex-1 px-3 py-2.5 text-sm font-mono uppercase bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
                   <button @click="redeemInviteCode"
                           :disabled="!isOnline || isProcessing || !inviteCodeInput.trim()"
@@ -268,6 +306,10 @@ const successMsg = ref('');
 const generatedCode = ref('');
 const generatedCodeCircleId = ref('');
 const copiedKey = ref('');
+const showFallbackRequest = ref(false);
+const fallbackXHandle = ref('');
+const fallbackNote = ref('');
+const submittedRequestCode = ref('');
 
 const refreshVerifyCode = () => {
   verifyCode.value = generatePostVerifyCode();
@@ -393,10 +435,38 @@ const redeemInviteCode = async () => {
       throw new Error('招待コードが無効、または有効期限切れ・利用上限に達しています。');
     }
     inviteCodeInput.value = '';
-    successMsg.value = '売り子としてサークルに参加しました！レジ機能が利用可能です。';
+    successMsg.value =
+      data.role === 'owner'
+        ? 'オーナー招待コードでサークル主として認証されました！'
+        : '売り子としてサークルに参加しました！レジ機能が利用可能です。';
     emit('memberships-updated');
   } catch (err) {
     errorMsg.value = err.message || 'コードの適用に失敗しました。';
+  } finally {
+    isProcessing.value = false;
+  }
+};
+
+const submitFallbackRequest = async () => {
+  if (!selectedCircleId.value || !fallbackXHandle.value.trim()) return;
+  errorMsg.value = '';
+  successMsg.value = '';
+  submittedRequestCode.value = '';
+  isProcessing.value = true;
+  try {
+    const { data, error } = await supabaseClient.rpc('submit_circle_auth_request', {
+      p_circle_id: selectedCircleId.value,
+      p_x_handle: fallbackXHandle.value.trim(),
+      p_note: fallbackNote.value.trim()
+    });
+    if (error) throw error;
+    if (!data?.ok) {
+      throw new Error(data?.error || '申請の送信に失敗しました。');
+    }
+    submittedRequestCode.value = data.request_code;
+    fallbackNote.value = '';
+  } catch (err) {
+    errorMsg.value = err.message || '個別認証申請の送信に失敗しました。';
   } finally {
     isProcessing.value = false;
   }
