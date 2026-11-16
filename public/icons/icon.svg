@@ -27,8 +27,8 @@
     <path d="M140 130 L175 165 L245 95" fill="none" stroke="#10b981" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
-  <!-- テキスト：VGGC 12th -->
+  <!-- テキスト：VGGC 13th -->
   <text x="256" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="900" fill="#1e293b" text-anchor="middle" letter-spacing="2">
-    VGGC 12th
+    VGGC 13th
   </text>
 </svg>
