@@ -50,6 +50,13 @@
           <span class="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md font-mono hidden sm:inline-block">
             PC大画面特化・リアルタイム同期
           </span>
+          <a v-if="adminProfile && adminProfile.x_handle"
+             :href="'https://x.com/' + adminProfile.x_handle"
+             target="_blank"
+             rel="noopener noreferrer"
+             class="text-xs bg-black text-white border border-slate-700 px-2.5 py-0.5 rounded-md font-mono font-bold hover:bg-slate-800 transition">
+            𝕏 @{{ adminProfile.x_handle }}
+          </a>
           <span v-if="hasUnsavedChanges" class="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1 animate-pulse">
             <span>● 未保存の変更: {{ unsavedSet.size }}件</span>
           </span>
@@ -1852,15 +1859,16 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
         const hasUnsavedChanges = computed(() => unsavedSet.value.size > 0);
 
         // 管理者権限を持つメールアドレスかどうか判定
+        const adminProfile = ref(null);
+
         const isAdminEmail = (email) => {
           if (!email) return false;
           const lower = email.toLowerCase().trim();
           return (
             lower === 'admin@vggc-13th.vercel.app' ||
+            lower === 'jamj__otaku@vggc-13th.vercel.app' ||
             lower === 'admin@vggc.dummy.local' ||
-            lower.includes('admin') ||
-            lower.startsWith('jamj__otaku') ||
-            lower.includes('jamj')
+            lower === 'jamj__otaku@vggc.dummy.local'
           );
         };
 
@@ -2116,6 +2124,16 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
 
             // Supabaseから追加データを取得
             const { data: dbData, error } = await supabaseClient.from('circle_info').select('*');
+            try {
+              if (user.value?.id) {
+                const { data: adminRow } = await supabaseClient
+                  .from('admin_users')
+                  .select('*')
+                  .eq('user_id', user.value.id)
+                  .maybeSingle();
+                if (adminRow) adminProfile.value = adminRow;
+              }
+            } catch (e) {}
             await fetchAuthRequests();
             if (!error && dbData) {
               dbData.forEach(info => {
@@ -3175,7 +3193,7 @@ ADD COLUMN IF NOT EXISTS staff_twitter TEXT;</code></pre>
           saveSpotifyClientId, copySpotifyRedirectUri, startSpotifyLogin, fetchSpotifyPlaylists,
           playSpotifyPlaylist, bookmarkSpotifyPlaylist, logoutSpotify,
           // 個別認証申請（鍵垢フォールバック受け皿）
-          showAuthRequestsPanel, authRequests, pendingAuthRequestsCount,
+          adminProfile, showAuthRequestsPanel, authRequests, pendingAuthRequestsCount,
           getCircleDisplayById, fetchAuthRequests, resolveAuthRequest
         };
       }
