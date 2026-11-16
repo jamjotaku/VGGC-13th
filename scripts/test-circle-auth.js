@@ -7,7 +7,11 @@ import {
   isXHandleMatchingCircle,
   extractXHandleFromUser,
   normalizeInviteCode,
-  getAuthMethodLabel
+  getAuthMethodLabel,
+  normalizeXPostUrl,
+  extractTextFromOembedHtml,
+  generatePostVerifyCode,
+  verifyOembedPayload
 } from '../src/utils/circleAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,5 +76,40 @@ for (const token of [
   assert.ok(sql.includes(token), `Missing SQL definition: ${token}`);
 }
 console.log('  ✅ [PASS] supabase/circle_auth.sql のテーブル・RLS・RPC 定義検証');
+
+// 7. ポストURL正規化 & oEmbed 検証テスト
+assert.equal(
+  normalizeXPostUrl('https://x.com/Jamj__Otaku/status/1857000000000000000?s=20'),
+  'https://twitter.com/Jamj__Otaku/status/1857000000000000000'
+);
+assert.equal(normalizeXPostUrl('https://example.com/status/123'), '');
+assert.equal(normalizeXPostUrl('https://x.com/Jamj__Otaku'), '');
+
+const genCode = generatePostVerifyCode();
+assert.match(genCode, /^VGGC13-[A-Z0-9]{6}$/);
+
+const mockOembed = {
+  author_url: 'https://twitter.com/Jamj__Otaku',
+  html: '<blockquote class="twitter-tweet"><p lang="ja" dir="ltr">VGGC 13th 認証コード: ' + genCode + ' <a href="https://t.co/xxx">#VGGC13th</a></p>&mdash; じゃむじゃ (@Jamj__Otaku)</blockquote>'
+};
+const extractedText = extractTextFromOembedHtml(mockOembed.html);
+assert.ok(extractedText.includes(genCode));
+
+const okVerify = verifyOembedPayload(mockOembed, genCode, sampleExtra);
+assert.equal(okVerify.ok, true);
+assert.equal(okVerify.authorHandle, 'jamj__otaku');
+
+const badCodeVerify = verifyOembedPayload(mockOembed, 'VGGC13-WRONG1', sampleExtra);
+assert.equal(badCodeVerify.ok, false);
+assert.equal(badCodeVerify.error, 'VERIFY_CODE_NOT_FOUND');
+
+const badHandleVerify = verifyOembedPayload(
+  { ...mockOembed, author_url: 'https://twitter.com/unknown_user' },
+  genCode,
+  sampleExtra
+);
+assert.equal(badHandleVerify.ok, false);
+assert.equal(badHandleVerify.error, 'X_HANDLE_MISMATCH');
+console.log('  ✅ [PASS] ポストURL正規化・oEmbed本文抽出・本人照合ロジック検証');
 
 console.log('✅ 全てのサークル認証テストに合格しました！');

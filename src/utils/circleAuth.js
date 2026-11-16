@@ -89,3 +89,83 @@ export function getAuthMethodLabel(authMethod) {
       return '未確認';
   }
 }
+
+/**
+ * X (Twitter) のポストURLを検証・正規化する
+ * 例: https://x.com/user/status/123456789?s=20 -> https://twitter.com/user/status/123456789
+ * @param {string} rawUrl
+ * @returns {string} 無効なURLなら空文字
+ */
+export function normalizeXPostUrl(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    const u = new URL(String(rawUrl).trim());
+    if (!/^(www\.)?(x\.com|twitter\.com)$/i.test(u.hostname)) return '';
+    const match = u.pathname.match(/^\/([A-Za-z0-9_]{1,30})\/status\/(\d+)/);
+    if (!match) return '';
+    return `https://twitter.com/${match[1]}/status/${match[2]}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * oEmbed HTML 内の <p>...</p> から本文テキストを抽出し、基本的なHTMLエンティティを復元する
+ * @param {string} html
+ * @returns {string}
+ */
+export function extractTextFromOembedHtml(html) {
+  if (!html) return '';
+  const pMatch = String(html).match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  const target = pMatch ? pMatch[1] : String(html);
+  return target
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * ワンタイム確認コードを生成する (例: VGGC13-A9K2M4)
+ * @returns {string}
+ */
+export function generatePostVerifyCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) {
+    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `VGGC13-${suffix}`;
+}
+
+/**
+ * oEmbed レスポンスを検証し、投稿者ハンドル・確認コード一致・サークル名簿一致を返す
+ * @param {Object} oembedJson
+ * @param {string} expectedCode
+ * @param {Object|null} circleExtra
+ * @returns {{ ok: boolean, authorHandle: string, hasCode: boolean, circleMatched: boolean, postText: string, error?: string }}
+ */
+export function verifyOembedPayload(oembedJson, expectedCode, circleExtra = null) {
+  const authorHandle = normalizeXHandle(oembedJson?.author_url || '');
+  const postText = extractTextFromOembedHtml(oembedJson?.html || '');
+  const code = String(expectedCode || '').trim().toUpperCase();
+  const hasCode = Boolean(code) && postText.toUpperCase().includes(code);
+  const circleMatched = circleExtra ? isXHandleMatchingCircle(circleExtra, authorHandle) : true;
+
+  if (!authorHandle) {
+    return { ok: false, authorHandle: '', hasCode, circleMatched: false, postText, error: 'AUTHOR_NOT_FOUND' };
+  }
+  if (!hasCode) {
+    return { ok: false, authorHandle, hasCode: false, circleMatched, postText, error: 'VERIFY_CODE_NOT_FOUND' };
+  }
+  if (circleExtra && !circleMatched) {
+    return { ok: false, authorHandle, hasCode: true, circleMatched: false, postText, error: 'X_HANDLE_MISMATCH' };
+  }
+
+  return { ok: true, authorHandle, hasCode: true, circleMatched: true, postText };
+}

@@ -11,7 +11,7 @@
             <span class="text-lg">🏪</span>
             <div>
               <h2 class="font-extrabold text-sm md:text-base text-gray-900">サークル認証・売り子連携</h2>
-              <p class="text-[11px] text-gray-500">サークル参加者向けPOSレジ・管理機能の有効化</p>
+              <p class="text-[11px] text-gray-500">完全無料・X連携権限不要の本人確認</p>
             </div>
           </div>
           <button @click="$emit('close')"
@@ -24,33 +24,24 @@
         <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
 
           <!-- エラー / 成功メッセージ -->
-          <div v-if="errorMsg" class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
+          <div v-if="errorMsg" class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold whitespace-pre-line">
             ⚠️ {{ errorMsg }}
           </div>
-          <div v-if="successMsg" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+          <div v-if="successMsg" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold whitespace-pre-line">
             ✅ {{ successMsg }}
           </div>
 
           <!-- 1. 未ログイン時 -->
           <div v-if="!user" class="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
             <p class="text-xs text-slate-700 leading-relaxed font-medium">
-              サークル機能の有効化には、まずアカウントへのログインが必要です。<br>
-              売り子として招待コードを使う場合は、通常の「IDログイン／新規登録」でログインした後にここを開いてください。
+              サークル認証や売り子参加を行うには、まず通常のアカウント（ユーザーID＋パスワード）でログインしてください。<br>
+              X アカウントとのアプリ連携（OAuth）は不要です。
             </p>
-            <div class="flex flex-col gap-2">
-              <button @click="loginWithXOAuth"
-                      :disabled="!isOnline || isProcessing"
-                      type="button"
-                      class="w-full min-h-[44px] px-4 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition">
-                <span>𝕏</span>
-                <span>X (Twitter) で最小権限ログイン</span>
-              </button>
-              <button @click="$emit('open-standard-auth')"
-                      type="button"
-                      class="w-full min-h-[40px] px-4 py-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-xl text-xs font-bold cursor-pointer transition">
-                通常のユーザーIDでログイン／新規登録
-              </button>
-            </div>
+            <button @click="$emit('open-standard-auth')"
+                    type="button"
+                    class="w-full min-h-[44px] px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-xs">
+              ユーザーIDでログイン / 新規登録
+            </button>
           </div>
 
           <!-- 2. ログイン済み時 -->
@@ -105,10 +96,10 @@
                   <div v-if="generatedCode && generatedCodeCircleId === m.circle_id"
                        class="p-2.5 bg-white border border-amber-300 rounded-xl flex items-center justify-between gap-2">
                     <span class="font-mono font-black text-sm text-gray-900 tracking-wider">{{ generatedCode }}</span>
-                    <button @click="copyCode(generatedCode)"
+                    <button @click="copyText(generatedCode, 'code')"
                             type="button"
                             class="px-2.5 py-1 rounded-lg bg-gray-900 text-white text-[11px] font-bold cursor-pointer">
-                      {{ copied ? '✓ コピー済' : 'コピー' }}
+                      {{ copiedKey === 'code' ? '✓ コピー済' : 'コピー' }}
                     </button>
                   </div>
                 </div>
@@ -132,41 +123,53 @@
                 </button>
               </div>
 
-              <!-- タブA：サークル主として X OAuth 認証 -->
+              <!-- タブA：確認コード付きポストURLによる完全無料本人確認 -->
               <div v-if="mode === 'owner'" class="space-y-3">
                 <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-950 space-y-1 leading-relaxed">
-                  <div class="font-extrabold">🔒 最小権限・安心設計について</div>
-                  <ul class="list-disc list-inside space-y-0.5 text-blue-900">
-                    <li>取得するのは <strong>X のユーザー名（読み取りのみ）</strong> で、投稿やDM権限は一切要求しません。</li>
-                    <li>認証完了後は <strong>X 側でアプリ連携をすぐ解除しても</strong> サークル機能をそのまま利用できます。</li>
-                  </ul>
+                  <div class="font-extrabold">🔒 アプリ連携なし・0円本人確認の手順</div>
+                  <ol class="list-decimal list-inside space-y-0.5 text-blue-900">
+                    <li>下の「確認コード」を含めて自分の X でポスト（認証後は削除OK）</li>
+                    <li>自分のサークルを選択し、そのポストの URL を貼って確認</li>
+                  </ol>
+                  <p class="text-[10px] text-blue-700 pt-0.5">※ 非公開（鍵）アカウントの場合は運営へ個別申請ください。</p>
                 </div>
 
-                <!-- 現在の X OAuth 連携状態 -->
-                <div class="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
-                  <div class="text-xs">
-                    <span class="text-gray-500 font-bold">X 連携状態: </span>
-                    <span v-if="currentXHandle" class="font-mono font-extrabold text-emerald-700">@{{ currentXHandle }} 連携済</span>
-                    <span v-else class="font-bold text-gray-600">未連携</span>
+                <!-- Step 1: ワンタイム確認コード -->
+                <div class="p-3 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-extrabold text-gray-700">Step 1. 確認コード</span>
+                    <button @click="refreshVerifyCode"
+                            type="button"
+                            class="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+                      再生成
+                    </button>
                   </div>
-                  <button v-if="!currentXHandle"
-                          @click="linkOrLoginWithX"
-                          :disabled="!isOnline || isProcessing"
-                          type="button"
-                          class="px-3 py-1.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-extrabold cursor-pointer">
-                    𝕏 連携する
-                  </button>
+                  <div class="flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-3 py-2">
+                    <span class="font-mono font-black text-sm text-gray-900 flex-1 tracking-wider">{{ verifyCode }}</span>
+                    <button @click="copyText(verifyCode, 'verify')"
+                            type="button"
+                            class="px-2.5 py-1 rounded-lg bg-gray-800 text-white text-[11px] font-bold cursor-pointer">
+                      {{ copiedKey === 'verify' ? '✓ コピー済' : 'コピー' }}
+                    </button>
+                  </div>
+                  <a :href="xPostIntentUrl"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="w-full min-h-[38px] px-3 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition">
+                    <span>𝕏</span>
+                    <span>確認用ポストを作成する</span>
+                  </a>
                 </div>
 
-                <!-- サークル検索＆選択 -->
+                <!-- Step 2: サークル検索＆選択 -->
                 <div class="space-y-1.5">
-                  <label class="text-xs font-extrabold text-gray-700 block">自分のサークルを選択</label>
+                  <label class="text-xs font-extrabold text-gray-700 block">Step 2. 自分のサークルを選択</label>
                   <input type="text"
                          v-model="circleSearch"
                          placeholder="スペース番号やサークル名で検索 (例: M-15, Black)"
                          class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
                   <div v-if="filteredCircles.length > 0"
-                       class="max-h-40 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+                       class="max-h-36 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
                     <button v-for="c in filteredCircles"
                             :key="c.circle_id"
                             @click="selectedCircleId = c.circle_id"
@@ -182,18 +185,27 @@
                   </div>
                 </div>
 
-                <button @click="verifyOwnerByX"
-                        :disabled="!isOnline || isProcessing || !currentXHandle || !selectedCircleId"
+                <!-- Step 3: ポストURL入力＆検証 -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-extrabold text-gray-700 block">Step 3. ポストのURLを貼り付け</label>
+                  <input type="url"
+                         v-model="postUrlInput"
+                         placeholder="https://x.com/your_id/status/123456789..."
+                         class="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <button @click="verifyOwnerByPostUrl"
+                        :disabled="!isOnline || isProcessing || !postUrlInput.trim() || !selectedCircleId"
                         type="button"
                         class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs md:text-sm font-extrabold shadow-sm cursor-pointer transition">
-                  {{ isProcessing ? '照合中...' : '選択したサークルで本人確認を実行' }}
+                  {{ isProcessing ? '公開ポストを確認中...' : 'ポストURLで本人確認を実行' }}
                 </button>
               </div>
 
               <!-- タブB：売り子招待コードで参加 -->
               <div v-else class="space-y-3">
                 <p class="text-xs text-gray-600 leading-relaxed">
-                  サークル主が発行した招待コード（例：<span class="font-mono font-bold">VC-A1B2-C3D4</span>）を入力すると、X連携なしで即座に売り子としてレジ機能を利用できます。
+                  サークル主が発行した招待コード（例：<span class="font-mono font-bold">VC-A1B2-C3D4</span>）を入力すると、即座に売り子としてレジ機能を利用できます。
                 </p>
                 <div class="flex gap-2">
                   <input type="text"
@@ -220,7 +232,13 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { supabaseClient } from '../supabase';
-import { extractXHandleFromUser, normalizeInviteCode, getAuthMethodLabel } from '../utils/circleAuth';
+import { EVENT_CONFIG } from '../eventConfig';
+import {
+  generatePostVerifyCode,
+  normalizeXPostUrl,
+  normalizeInviteCode,
+  getAuthMethodLabel
+} from '../utils/circleAuth';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -233,17 +251,26 @@ const props = defineProps({
 const emit = defineEmits(['close', 'open-standard-auth', 'memberships-updated']);
 
 const mode = ref('owner');
+const verifyCode = ref(generatePostVerifyCode());
 const circleSearch = ref('');
 const selectedCircleId = ref('');
+const postUrlInput = ref('');
 const inviteCodeInput = ref('');
 const isProcessing = ref(false);
 const errorMsg = ref('');
 const successMsg = ref('');
 const generatedCode = ref('');
 const generatedCodeCircleId = ref('');
-const copied = ref(false);
+const copiedKey = ref('');
 
-const currentXHandle = computed(() => extractXHandleFromUser(props.user));
+const refreshVerifyCode = () => {
+  verifyCode.value = generatePostVerifyCode();
+};
+
+const xPostIntentUrl = computed(() => {
+  const text = `${EVENT_CONFIG.name} サークル認証用確認コード: ${verifyCode.value}\n${EVENT_CONFIG.hashtag}`;
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+});
 
 const filteredCircles = computed(() => {
   const q = circleSearch.value.trim().toLowerCase();
@@ -275,62 +302,46 @@ const formatDateTime = (iso) => {
   }
 };
 
-const loginWithXOAuth = async () => {
-  errorMsg.value = '';
-  try {
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider: 'twitter',
-      options: {
-        scopes: 'users.read',
-        redirectTo: window.location.origin
-      }
-    });
-    if (error) throw error;
-  } catch (err) {
-    errorMsg.value = err.message || 'X OAuth ログインの開始に失敗しました。';
+const verifyOwnerByPostUrl = async () => {
+  const normalizedUrl = normalizeXPostUrl(postUrlInput.value);
+  if (!normalizedUrl) {
+    errorMsg.value = '有効な X (Twitter) のポストURL（例: https://x.com/user/status/123...）を入力してください。';
+    return;
   }
-};
-
-const linkOrLoginWithX = async () => {
-  errorMsg.value = '';
-  try {
-    if (supabaseClient.auth.linkIdentity) {
-      const { error } = await supabaseClient.auth.linkIdentity({
-        provider: 'twitter',
-        options: {
-          scopes: 'users.read',
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } else {
-      await loginWithXOAuth();
-    }
-  } catch (err) {
-    errorMsg.value = err.message || 'X 連携の開始に失敗しました。';
-  }
-};
-
-const verifyOwnerByX = async () => {
-  if (!selectedCircleId.value) return;
   errorMsg.value = '';
   successMsg.value = '';
   isProcessing.value = true;
+
   try {
-    const { data, error } = await supabaseClient.rpc('verify_circle_owner_by_x', {
-      p_circle_id: selectedCircleId.value
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch('/api/verify-x-post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+      },
+      body: JSON.stringify({
+        postUrl: normalizedUrl,
+        expectedCode: verifyCode.value,
+        circleId: selectedCircleId.value
+      })
     });
-    if (error) throw error;
-    if (!data?.ok) {
-      if (data?.error === 'X_HANDLE_MISMATCH') {
-        throw new Error(`連携中の X アカウント (@${data.verified_x_handle}) が、このサークルの登録アカウントと一致しません。`);
-      }
-      throw new Error(data?.error || '本人確認に失敗しました。');
+
+    const data = await res.json();
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.message || data?.error || 'ポストの検証に失敗しました。');
     }
-    successMsg.value = `サークル主として認証されました！(@${data.verified_x_handle})`;
-    emit('memberships-updated');
+
+    if (data.mode === 'persisted') {
+      successMsg.value = `サークル主として認証されました！(@${data.authorHandle})\n確認用ポストは削除して問題ありません。`;
+      postUrlInput.value = '';
+      refreshVerifyCode();
+      emit('memberships-updated');
+    } else {
+      successMsg.value = `oEmbed 疎通テスト成功！\n投稿者: @${data.authorHandle}\n確認コード一致を確認しました。（※DB永続化には Vercel 側の SUPABASE_SERVICE_ROLE_KEY 設定が必要です）`;
+    }
   } catch (err) {
-    errorMsg.value = err.message || '認証処理でエラーが発生しました。';
+    errorMsg.value = err.message || 'ポスト確認処理でエラーが発生しました。';
   } finally {
     isProcessing.value = false;
   }
@@ -349,7 +360,7 @@ const generateInviteCode = async (circleId) => {
     if (!data?.ok) throw new Error(data?.error || '招待コードの発行に失敗しました。');
     generatedCode.value = data.code;
     generatedCodeCircleId.value = circleId;
-    copied.value = false;
+    copiedKey.value = '';
     successMsg.value = '売り子用の招待コードを発行しました！';
   } catch (err) {
     errorMsg.value = err.message || '招待コード発行に失敗しました。';
@@ -403,10 +414,10 @@ const revokeMembership = async (circleId) => {
   }
 };
 
-const copyCode = async (code) => {
+const copyText = async (text, key) => {
   try {
-    await navigator.clipboard.writeText(code);
-    copied.value = true;
+    await navigator.clipboard.writeText(text);
+    copiedKey.value = key;
   } catch (e) {}
 };
 </script>
