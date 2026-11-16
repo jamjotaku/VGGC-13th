@@ -35,12 +35,12 @@ CREATE POLICY "Allow admin to insert/update"
   FOR ALL
   TO authenticated
   USING (
-    auth.jwt() ->> 'email' IN ('admin@vggc.dummy.local', 'jamj__otaku@vggc.dummy.local')
+    auth.jwt() ->> 'email' IN ('admin@vggc-13th.vercel.app', 'jamj__otaku@vggc-13th.vercel.app', 'admin@vggc.dummy.local', 'jamj__otaku@vggc.dummy.local')
     OR auth.jwt() ->> 'email' LIKE '%admin%'
     OR auth.jwt() ->> 'email' LIKE '%jamj%'
   )
   WITH CHECK (
-    auth.jwt() ->> 'email' IN ('admin@vggc.dummy.local', 'jamj__otaku@vggc.dummy.local')
+    auth.jwt() ->> 'email' IN ('admin@vggc-13th.vercel.app', 'jamj__otaku@vggc-13th.vercel.app', 'admin@vggc.dummy.local', 'jamj__otaku@vggc.dummy.local')
     OR auth.jwt() ->> 'email' LIKE '%admin%'
     OR auth.jwt() ->> 'email' LIKE '%jamj%'
   );

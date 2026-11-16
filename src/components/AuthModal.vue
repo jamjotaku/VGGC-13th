@@ -26,6 +26,7 @@
 <script setup>
 import { ref } from 'vue';
 import { supabaseClient } from '../supabase';
+import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
   show: {
@@ -53,7 +54,12 @@ const handleAuth = async () => {
   }
   authError.value = '';
   authMessage.value = '';
-  const dummyEmail = authId.value.trim() + '@vggc.dummy.local';
+  const cleanId = authId.value.trim();
+  if (!/^[a-zA-Z0-9_.-]+$/.test(cleanId)) {
+    authError.value = 'ユーザーIDは半角英数字と記号（_ - .）のみで入力してください。';
+    return;
+  }
+  const dummyEmail = `${cleanId}@${EVENT_CONFIG.dummyEmailDomain}`;
   try {
     if (authMode.value === 'register') {
       const { error } = await supabaseClient.auth.signUp({ email: dummyEmail, password: authPassword.value });

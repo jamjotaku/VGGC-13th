@@ -7,6 +7,7 @@ export const EVENT_CONFIG = {
   name: 'VGGC 13th',
   shortName: 'VGGC 13th',
   slug: 'vggc13th',
+  dummyEmailDomain: 'vggc-13th.vercel.app',
   hashtag: '#VGGC13th',
   siteUrl: 'https://vggc-13th.vercel.app/',
   title: 'VGGC 13th サークルリスト & 会場マップ',
