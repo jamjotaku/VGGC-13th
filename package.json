@@ -3,10 +3,11 @@
   "version": "2.0.0-alpha.0",
   "main": "postcss.config.js",
   "scripts": {
-    "test": "node scripts/test-offline-rehearsal.js && node scripts/test-route-graph.js && node scripts/test-circle-auth.js",
+    "test": "node scripts/test-offline-rehearsal.js && node scripts/test-route-graph.js && node scripts/test-circle-auth.js && node scripts/test-register-v2.js",
     "test:offline": "node scripts/test-offline-rehearsal.js",
     "test:route": "node scripts/test-route-graph.js",
     "test:auth": "node scripts/test-circle-auth.js",
+    "test:register": "node scripts/test-register-v2.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

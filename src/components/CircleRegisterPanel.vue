@@ -368,8 +368,30 @@
             </div>
           </div>
 
-          <!-- 預かり金額 ＆ お釣り表示ボックス -->
-          <div class="grid grid-cols-2 gap-2.5">
+          <!-- 決済方法切替 (現金 / キャッシュレス) -->
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+            <button
+              type="button"
+              @click="paymentMethod = 'cash'"
+              class="py-1.5 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-1 cursor-pointer"
+              :class="paymentMethod === 'cash' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-300 hover:text-white'"
+            >
+              <span>💵</span>
+              <span>現金</span>
+            </button>
+            <button
+              type="button"
+              @click="paymentMethod = 'cashless'"
+              class="py-1.5 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-1 cursor-pointer"
+              :class="paymentMethod === 'cashless' ? 'bg-sky-500 text-slate-950 shadow-xs' : 'text-slate-300 hover:text-white'"
+            >
+              <span>📱</span>
+              <span>キャッシュレス</span>
+            </button>
+          </div>
+
+          <!-- 預かり金額 ＆ お釣り表示ボックス (現金時のみ表示) -->
+          <div v-if="paymentMethod === 'cash'" class="grid grid-cols-2 gap-2.5">
             <div class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2">
               <div class="flex items-center justify-between">
                 <span class="text-[11px] font-bold text-slate-400">お預かり</span>
@@ -412,8 +434,14 @@
             </div>
           </div>
 
-          <!-- 預かり金ワンタップ金種ボタン群 (即売会特化) -->
-          <div class="space-y-1.5">
+          <!-- キャッシュレス案内 -->
+          <div v-else class="bg-sky-950/60 border border-sky-700/70 rounded-xl px-3 py-2.5 text-xs text-sky-200 font-bold flex items-center justify-between">
+            <span>📱 PayPay・電子決済（お釣り不要）</span>
+            <span class="font-mono text-white">¥{{ cartTotalAmount.toLocaleString() }}</span>
+          </div>
+
+          <!-- 預かり金ワンタップ金種ボタン群 (現金時のみ表示) -->
+          <div v-if="paymentMethod === 'cash'" class="space-y-1.5">
             <div class="grid grid-cols-3 gap-1.5">
               <button
                 @click="setExactDeposit"
@@ -786,12 +814,87 @@
                 {{ validTransactions.length }} <span class="text-sm font-bold text-slate-500">組</span>
               </div>
             </div>
-            <button
-              @click="copySalesSummaryToClipboard"
-              class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition cursor-pointer"
-            >
-              📋 集計レポートをコピー
-            </button>
+            <div class="flex flex-col gap-1.5 shrink-0">
+              <button
+                @click="copySalesSummaryToClipboard"
+                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition cursor-pointer"
+              >
+                📋 レポートコピー
+              </button>
+              <button
+                @click="downloadSettlementCsv"
+                class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition cursor-pointer"
+              >
+                📥 精算CSV保存
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ 決済別売上・現金実査ガイド ＆ 来訪予測数 (v2新機能) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+          <!-- 決済別・つり銭実査ガイド -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-extrabold text-slate-800">💵 決済方法別 ＆ レジ現金実査</h3>
+              <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">終了後照合</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <div class="text-[11px] font-bold text-emerald-800">💵 現金売上</div>
+                <div class="text-lg font-black font-mono text-emerald-950 mt-0.5">¥{{ paymentSummary.cashTotal.toLocaleString() }}</div>
+              </div>
+              <div class="p-3 rounded-xl bg-sky-50/70 border border-sky-200">
+                <div class="text-[11px] font-bold text-sky-800">📱 キャッシュレス</div>
+                <div class="text-lg font-black font-mono text-sky-950 mt-0.5">¥{{ paymentSummary.cashlessTotal.toLocaleString() }}</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600">準備釣銭: ¥</span>
+                <input
+                  type="number"
+                  v-model.number="initialFloatCash"
+                  min="0"
+                  step="1000"
+                  class="w-24 px-2 py-1 bg-white border border-slate-300 rounded-lg font-mono font-bold text-right"
+                />
+              </div>
+              <div class="font-bold text-slate-700">
+                理論レジ内現金: <span class="font-mono font-black text-emerald-700 text-sm">¥{{ (paymentSummary.cashTotal + (Number(initialFloatCash) || 0)).toLocaleString() }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 自サークルの買い物リスト登録数（来訪予測） -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-sm font-extrabold text-slate-800">📊 買い物リスト登録数（来訪予測）</h3>
+              <button
+                type="button"
+                @click="fetchDemandStats"
+                :disabled="!isOnline || isLoadingDemand"
+                class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-extrabold cursor-pointer transition"
+              >
+                {{ isLoadingDemand ? '取得中...' : '🔄 更新' }}
+              </button>
+            </div>
+            <div v-if="demandStats" class="space-y-2">
+              <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-black font-mono text-indigo-700">{{ demandStats.total_lists }}</span>
+                <span class="text-xs font-bold text-slate-600">人がリストに登録中</span>
+              </div>
+              <div class="grid grid-cols-4 gap-1.5 text-center text-[11px]">
+                <div class="p-1.5 rounded-lg bg-rose-50 border border-rose-200 font-bold text-rose-800">S: {{ demandStats.priority_breakdown?.S ?? 0 }}</div>
+                <div class="p-1.5 rounded-lg bg-amber-50 border border-amber-200 font-bold text-amber-800">A: {{ demandStats.priority_breakdown?.A ?? 0 }}</div>
+                <div class="p-1.5 rounded-lg bg-blue-50 border border-blue-200 font-bold text-blue-800">B: {{ demandStats.priority_breakdown?.B ?? 0 }}</div>
+                <div class="p-1.5 rounded-lg bg-slate-50 border border-slate-200 font-bold text-slate-600">未: {{ demandStats.priority_breakdown?.none ?? 0 }}</div>
+              </div>
+            </div>
+            <div v-else class="text-xs text-slate-500 py-2">
+              「🔄 更新」を押すと、他参加者の買い物リストに自サークルが何件登録されているか（合計＆優先度内訳のみ）を確認できます。
+            </div>
+            <p class="text-[10px] text-slate-400">※ 登録数＝購入確約数ではありません。部数や釣銭準備の目安としてご活用ください。</p>
           </div>
         </div>
 
@@ -1059,6 +1162,11 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { supabaseClient } from '../supabase';
+import {
+  aggregateTransactions,
+  mergeTransactionsWithCloudEvents,
+  buildRegisterSettlementCsv
+} from '../utils/registerV2';
 import { EVENT_CONFIG } from '../eventConfig';
 
 const props = defineProps({
@@ -1236,6 +1344,12 @@ const getSellerSolidClass = (sellerName) => {
 // 現在の会計カート: { [productId]: qty }
 const cart = ref({});
 const depositAmount = ref(0);
+const paymentMethod = ref('cash'); // 'cash' | 'cashless'
+const initialFloatCash = ref(20000);
+const demandStats = ref(null);
+const isLoadingDemand = ref(false);
+const pendingRegisterEvents = ref([]);
+const deviceLabel = ref(typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'スマホ端末' : 'PC/タブレット');
 
 const depositInputModel = computed({
   get: () => (depositAmount.value > 0 ? depositAmount.value : ''),
@@ -1377,8 +1491,12 @@ const changeAmount = computed(() => {
 
 const canCompleteCheckout = computed(() => {
   if (cartTotalCount.value <= 0) return false;
-  if (depositAmount.value > 0 && depositAmount.value < cartTotalAmount.value) return false;
+  if (paymentMethod.value === 'cash' && depositAmount.value > 0 && depositAmount.value < cartTotalAmount.value) return false;
   return true;
+});
+
+const paymentSummary = computed(() => {
+  return aggregateTransactions(registerState.value.transactions || []);
 });
 
 // 有効な売上履歴（取消済みを除く）
@@ -1660,8 +1778,9 @@ const completeCheckout = () => {
   if (!canCompleteCheckout.value) return;
 
   const total = cartTotalAmount.value;
-  const actualDeposit = depositAmount.value > 0 ? depositAmount.value : total;
-  const change = actualDeposit - total;
+  const isCash = paymentMethod.value === 'cash';
+  const actualDeposit = isCash && depositAmount.value > 0 ? depositAmount.value : total;
+  const change = isCash ? actualDeposit - total : 0;
   const txItems = [];
 
   // 各商品の頒布数(soldCount)を加算
@@ -1699,17 +1818,35 @@ const completeCheckout = () => {
     total,
     deposit: actualDeposit,
     change,
+    paymentMethod: paymentMethod.value,
+    deviceLabel: deviceLabel.value,
     voided: false
   };
 
   registerState.value.transactions.unshift(tx);
+  pendingRegisterEvents.value.push({
+    id: tx.id,
+    event_type: 'checkout',
+    payload: {
+      txId: tx.id,
+      timestamp: tx.timestamp,
+      items: tx.items,
+      total: tx.total,
+      deposit: tx.deposit,
+      change: tx.change,
+      paymentMethod: tx.paymentMethod,
+      deviceLabel: tx.deviceLabel
+    }
+  });
 
   // カートリセット & 保存
   clearCart();
+  paymentMethod.value = 'cash';
   commitRegisterState();
 
   // トースト通知
-  showFeedback(`会計完了 ¥${total.toLocaleString()} ${change > 0 ? `(お釣り ¥${change.toLocaleString()})` : ''}`);
+  const payLabel = isCash ? (change > 0 ? `(お釣り ¥${change.toLocaleString()})` : '') : '(キャッシュレス)';
+  showFeedback(`会計完了 ¥${total.toLocaleString()} ${payLabel}`);
 };
 
 // 会計取消 (在庫を戻す)
@@ -1720,6 +1857,11 @@ const confirmVoidTransaction = (tx) => {
   }
 
   tx.voided = true;
+  pendingRegisterEvents.value.push({
+    id: `void_${tx.id}_${Date.now()}`,
+    event_type: 'void',
+    payload: { targetTxId: tx.id }
+  });
 
   for (const item of tx.items || []) {
     const customTarget = registerState.value.customItems.find(c => c.id === item.id);
@@ -1918,7 +2060,8 @@ const saveToLocalCache = () => {
   try {
     localStorage.setItem(localStorageKey.value, JSON.stringify({
       ...registerState.value,
-      pendingSync: hasPendingSync.value
+      pendingSync: hasPendingSync.value,
+      pendingEvents: pendingRegisterEvents.value
     }));
   } catch (e) {
     console.warn('Register localStorage save failed:', e);
@@ -1943,12 +2086,41 @@ const loadFromLocalCache = () => {
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : []
       };
       hasPendingSync.value = Boolean(parsed.pendingSync);
+      pendingRegisterEvents.value = Array.isArray(parsed.pendingEvents) ? parsed.pendingEvents : [];
       return true;
     }
   } catch (e) {
     console.warn('Register localStorage restore error:', e);
   }
   return false;
+};
+
+// マージされたトランザクション一覧から全商品の soldCount を決定論的に再計算
+const applyMergedTransactions = (mergedTxs) => {
+  registerState.value.transactions = mergedTxs;
+  const { soldCountsByProductId } = aggregateTransactions(mergedTxs);
+
+  for (const c of registerState.value.customItems) {
+    if (c && c.id) {
+      c.soldCount = soldCountsByProductId[c.id] || 0;
+    }
+  }
+  for (const [pid, ov] of Object.entries(registerState.value.itemOverrides || {})) {
+    if (ov) {
+      ov.soldCount = soldCountsByProductId[pid] || 0;
+    }
+  }
+  for (const [pid, count] of Object.entries(soldCountsByProductId)) {
+    const isCustom = registerState.value.customItems.some(c => c.id === pid);
+    if (!isCustom && !registerState.value.itemOverrides[pid]) {
+      const base = (props.circleExtra?.items || []).find((it, idx) => `base_${idx}` === pid || it.id === pid);
+      registerState.value.itemOverrides[pid] = {
+        initialStock: base?.stock ?? null,
+        soldCount: count,
+        manualSoldOut: false
+      };
+    }
+  }
 };
 
 const commitRegisterState = () => {
@@ -1967,10 +2139,53 @@ const scheduleCloudSync = () => {
   }, 1200);
 };
 
+const pushPendingEventsToV2 = async () => {
+  if (!props.user || !props.isOnline || pendingRegisterEvents.value.length === 0) return;
+  try {
+    const rows = pendingRegisterEvents.value.map(ev => ({
+      id: ev.id,
+      circle_id: props.circleId,
+      user_id: props.user.id,
+      device_label: deviceLabel.value,
+      event_type: ev.event_type,
+      payload: ev.payload
+    }));
+    const { error } = await supabaseClient
+      .from('circle_register_events')
+      .upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    if (!error) {
+      pendingRegisterEvents.value = [];
+    }
+  } catch (e) {
+    // v2 テーブル未作成環境では安全にスキップ
+  }
+};
+
 const pushStateToCloud = async () => {
   if (!props.user || !props.isOnline) return;
   isSyncing.value = true;
   try {
+    await pushPendingEventsToV2();
+
+    // v2 共有マスタ (circle_register_states) への同期
+    try {
+      await supabaseClient
+        .from('circle_register_states')
+        .upsert({
+          circle_id: props.circleId,
+          state_data: {
+            revision: registerState.value.revision,
+            updatedAt: registerState.value.updatedAt,
+            sellers: activeSellers.value,
+            itemOverrides: registerState.value.itemOverrides,
+            customItems: registerState.value.customItems
+          },
+          updated_by: props.user.id,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'circle_id' });
+    } catch (e) {}
+
+    // v1 互換 (register_data) への同期
     const payload = {
       user_id: props.user.id,
       circle_id: props.circleId,
@@ -2004,11 +2219,49 @@ const pushStateToCloud = async () => {
   }
 };
 
-// クラウドからの読み込み＆リビジョン比較マージ（オフライン中の売上消失を100%防止）
+// クラウドからの読み込み＆v2イベントログ統合マージ（複数端末同期・オフライン消失防止）
 const syncWithCloudOnInitOrOnline = async () => {
   if (!props.user || !props.isOnline) return;
   isSyncing.value = true;
   try {
+    // 1. 未送信イベントがあれば先に送信
+    await pushPendingEventsToV2();
+
+    // 2. v2 共有マスタ＆イベントログの取得を試行
+    const [v2StateRes, v2EventsRes] = await Promise.all([
+      supabaseClient
+        .from('circle_register_states')
+        .select('*')
+        .eq('circle_id', props.circleId)
+        .maybeSingle(),
+      supabaseClient
+        .from('circle_register_events')
+        .select('*')
+        .eq('circle_id', props.circleId)
+        .order('created_at', { ascending: true })
+    ]);
+
+    if (!v2StateRes.error && v2StateRes.data?.state_data) {
+      const sData = v2StateRes.data.state_data;
+      const cloudRev = Number(sData.revision) || 0;
+      const localRev = Number(registerState.value.revision) || 0;
+      if (cloudRev > localRev && !hasPendingSync.value) {
+        registerState.value.revision = cloudRev;
+        registerState.value.updatedAt = sData.updatedAt || v2StateRes.data.updated_at;
+        registerState.value.sellers = normalizeLoadedSellers(sData.sellers);
+        registerState.value.itemOverrides = sData.itemOverrides || {};
+        registerState.value.customItems = Array.isArray(sData.customItems) ? sData.customItems : [];
+      }
+    }
+
+    if (!v2EventsRes.error && Array.isArray(v2EventsRes.data)) {
+      const merged = mergeTransactionsWithCloudEvents(registerState.value.transactions, v2EventsRes.data);
+      applyMergedTransactions(merged);
+      saveToLocalCache();
+      return;
+    }
+
+    // 3. v2 テーブル未作成時フォールバック: 従来の register_data (v1) 同期
     const fetchPromise = supabaseClient
       .from('register_data')
       .select('*')
@@ -2023,7 +2276,6 @@ const syncWithCloudOnInitOrOnline = async () => {
     }
 
     if (!data) {
-      // まだ行が存在しない場合は現在のローカル状態で初期行を作成
       await pushStateToCloud();
       return;
     }
@@ -2033,7 +2285,6 @@ const syncWithCloudOnInitOrOnline = async () => {
     const localRev = Number(registerState.value.revision) || 0;
 
     if (cloudRev > localRev && !hasPendingSync.value) {
-      // クラウドの方が新しい場合のみクラウドを採用（旧データで sellers が無い場合も安全に補完）
       registerState.value = {
         revision: cloudRev,
         updatedAt: cloudState.updatedAt || data.updated_at,
@@ -2045,13 +2296,79 @@ const syncWithCloudOnInitOrOnline = async () => {
       hasPendingSync.value = false;
       saveToLocalCache();
     } else if (localRev > cloudRev || hasPendingSync.value) {
-      // ローカルの方が進んでいる場合（圏外で会計を進めた後など）はローカルをクラウドへPush
       await pushStateToCloud();
     }
   } catch (e) {
     console.warn('syncWithCloudOnInitOrOnline error:', e);
   } finally {
     isSyncing.value = false;
+  }
+};
+
+// 精算CSVダウンロード (UTF-8 BOM付)
+const downloadSettlementCsv = () => {
+  const csv = buildRegisterSettlementCsv({
+    circleLabel: `${circleSpaceLabel.value} ${circleName.value}`,
+    transactions: registerState.value.transactions || [],
+    products: allProducts.value
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `register_settlement_${props.circleId}_${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showFeedback('精算CSVをダウンロードしました！');
+};
+
+// 自サークルの買い物リスト登録数（来訪予測数）を取得
+const fetchDemandStats = async () => {
+  if (!props.user || !props.isOnline) return;
+  isLoadingDemand.value = true;
+  try {
+    const { data, error } = await supabaseClient.rpc('get_my_circle_demand_stats', {
+      p_circle_id: props.circleId
+    });
+    if (!error && data?.ok) {
+      demandStats.value = data;
+    } else {
+      showFeedback('来訪予測データの取得をスキップしました（SQL未反映または権限外）');
+    }
+  } catch (e) {
+    console.warn('fetchDemandStats skipped:', e);
+  } finally {
+    isLoadingDemand.value = false;
+  }
+};
+
+let registerRealtimeChannel = null;
+const subscribeRegisterRealtime = () => {
+  if (!props.user || !props.isOnline || registerRealtimeChannel) return;
+  try {
+    registerRealtimeChannel = supabaseClient
+      .channel(`register_events:${props.circleId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'circle_register_events', filter: `circle_id=eq.${props.circleId}` },
+        (payload) => {
+          if (payload?.new) {
+            const merged = mergeTransactionsWithCloudEvents(registerState.value.transactions, [payload.new]);
+            applyMergedTransactions(merged);
+            saveToLocalCache();
+          }
+        }
+      )
+      .subscribe();
+  } catch (e) {}
+};
+
+const unsubscribeRegisterRealtime = () => {
+  if (registerRealtimeChannel) {
+    try { supabaseClient.removeChannel(registerRealtimeChannel); } catch (e) {}
+    registerRealtimeChannel = null;
   }
 };
 
@@ -2120,12 +2437,16 @@ watch(() => props.circleExtra, (newExtra) => {
 watch(() => props.isOnline, (online) => {
   if (online) {
     syncWithCloudOnInitOrOnline();
+    subscribeRegisterRealtime();
+  } else {
+    unsubscribeRegisterRealtime();
   }
 });
 
 watch(() => props.user, (newUser) => {
   if (newUser && props.isOnline) {
     syncWithCloudOnInitOrOnline();
+    subscribeRegisterRealtime();
   }
 });
 
@@ -2133,6 +2454,7 @@ onMounted(() => {
   loadFromLocalCache();
   if (props.user && props.isOnline) {
     syncWithCloudOnInitOrOnline();
+    subscribeRegisterRealtime();
   }
   syncFullscreenState();
   document.addEventListener('fullscreenchange', syncFullscreenState);
@@ -2140,6 +2462,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  unsubscribeRegisterRealtime();
   document.removeEventListener('fullscreenchange', syncFullscreenState);
   document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
 });
