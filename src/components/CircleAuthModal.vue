@@ -46,6 +46,12 @@
 
           <!-- 2. ログイン済み時 -->
           <template v-else>
+            <!-- 現在の紐付けステータスバナー -->
+            <div v-if="memberships.length === 0"
+                 class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-center justify-between gap-2">
+              <span class="font-bold">状態：<span class="text-rose-600">未紐付け</span>（下のタブから認証できます）</span>
+            </div>
+
             <!-- 紐付け済みサークル一覧（監査ログ・解除・売り子コード発行） -->
             <div v-if="memberships.length > 0" class="space-y-2.5">
               <div class="text-xs font-extrabold text-gray-700 flex items-center justify-between">
