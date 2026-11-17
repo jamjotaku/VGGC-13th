@@ -4,6 +4,20 @@
     <!-- ★ PWA自動更新＆オフライン通知トースト -->
     <PwaUpdateToast />
 
+    <!-- ★ テストモード固定バナー（?mode=test 時のみ表示） -->
+    <div v-if="isTestMode"
+         class="bg-indigo-700 text-white px-3 py-1.5 text-[11px] font-bold flex items-center justify-between gap-2 z-30 shrink-0 shadow-xs">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span class="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-black shrink-0">TEST MODE</span>
+        <span class="truncate">ダミー240件で検証中（Supabaseバイパス・保存先分離・本番非干渉）</span>
+      </div>
+      <button type="button"
+              @click="exitTestMode"
+              class="px-2 py-0.5 rounded-md bg-white text-indigo-800 hover:bg-indigo-50 text-[10px] font-extrabold shrink-0 cursor-pointer">
+        通常モードへ戻る
+      </button>
+    </div>
+
     <!-- ナビゲーションバー (レジモード時は非表示にして全画面化) -->
     <nav v-show="activeTab !== 'register'" class="bg-white shadow-sm border-b px-3 md:px-4 py-2 md:py-2.5 flex justify-between items-center z-20 flex-shrink-0">
       <div class="font-bold text-base md:text-lg flex items-center gap-2">
@@ -1133,6 +1147,17 @@
                リスト タブ (買い物リスト・予算・優先度)
           ========================================== -->
           <div v-show="activeTab === 'list'" class="flex flex-col min-h-full pb-28 md:pb-8 relative">
+
+            <!-- ★ テストモード専用：新機能プレビュー（通常訪問者には非表示） -->
+            <div v-if="isTestMode" class="px-2.5 md:px-3.5 pt-2.5">
+              <TestModeToolsPanel
+                :saved-list="savedList"
+                :circles="circles"
+                :circle-extra-info="circleExtraInfo"
+                @replace-saved-list="replaceSavedListForTest"
+                @open-route-map="openTestRouteMap"
+              />
+            </div>
             
             <div class="sticky top-0 z-20 bg-gray-50/95 backdrop-blur-md p-2.5 md:p-3.5 border-b border-gray-200 shadow-sm space-y-2">
               <!-- 達成度プログレスバー ＆ スリムヘッダー切替 -->
@@ -1840,8 +1865,13 @@ import NotificationModal from './components/NotificationModal.vue';
 import PwaUpdateToast from './components/PwaUpdateToast.vue';
 import CircleRegisterPanel from './components/CircleRegisterPanel.vue';
 import CircleAuthModal from './components/CircleAuthModal.vue';
+import TestModeToolsPanel from './components/TestModeToolsPanel.vue';
 import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
+import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventData } from './utils/testMode';
+
+        const isTestMode = isTestModeActive();
+        const ACTIVE_STORAGE_KEY = isTestMode ? getTestStorageKey('saved_list') : STORAGE_KEY;
 
         // ★ サークル参加モード（簡易レジ v1 + 汎用サークル認証連携）
         const REGISTER_CIRCLE_ID = EVENT_CONFIG.register.defaultCircleId;
@@ -2716,7 +2746,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         };
 
         const getLocalStoredList = () => {
-          const stored = localStorage.getItem(STORAGE_KEY);
+          const stored = localStorage.getItem(ACTIVE_STORAGE_KEY);
           let localData = {};
           if (stored) {
             try { localData = JSON.parse(stored) || {}; } catch (e) { localData = {}; }
@@ -2727,8 +2757,20 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           return localData;
         };
 
+        const replaceSavedListForTest = (nextData) => {
+          if (!isTestMode) return;
+          savedList.value = nextData && typeof nextData === 'object' ? nextData : {};
+          syncFreeMemoFromState();
+        };
+
+        const openTestRouteMap = () => {
+          sortOrder.value = 'route';
+          showRouteOverlay.value = true;
+          activeTab.value = 'map';
+        };
+
         const saveToCloud = async (newVal) => {
-          if (!user.value || !isOnline.value || isReadOnly.value) return; 
+          if (isTestMode || !user.value || !isOnline.value || isReadOnly.value) return; 
           clearTimeout(saveTimeout); isSaving.value = true;
           saveTimeout = setTimeout(async () => {
             try {
@@ -2782,6 +2824,11 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
 
         // Supabaseから通知を取得 (2.5秒タイムアウト保護付き)
         const fetchNotifications = async () => {
+          // テストモード時は Supabase をバイパスしデフォルト通知のみ使用
+          if (isTestMode) {
+            notifications.value = [...DEFAULT_NOTIFICATIONS];
+            return;
+          }
           // まずローカルキャッシュから即時復元 (0ms)
           try {
             const cached = localStorage.getItem('vggc_cached_notifications');
@@ -2909,20 +2956,22 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
             }
           });
 
-          // ★ オフライン対策: キャッシュから即時データを復元 (SWR)
-          try {
-            const cachedData = localStorage.getItem(EVENT_CONFIG.storageKey('data_cache'));
-            if (cachedData) {
-              const parsed = JSON.parse(cachedData);
-              if (parsed.circles && parsed.circles.length) circles.value = parsed.circles;
-              if (parsed.blocks && parsed.blocks.length) blocks.value = parsed.blocks;
+          // ★ オフライン対策: キャッシュから即時データを復元 (SWR・通常モード時のみ)
+          if (!isTestMode) {
+            try {
+              const cachedData = localStorage.getItem(EVENT_CONFIG.storageKey('data_cache'));
+              if (cachedData) {
+                const parsed = JSON.parse(cachedData);
+                if (parsed.circles && parsed.circles.length) circles.value = parsed.circles;
+                if (parsed.blocks && parsed.blocks.length) blocks.value = parsed.blocks;
+              }
+              const cachedExtra = localStorage.getItem(EVENT_CONFIG.storageKey('circle_info_cache'));
+              if (cachedExtra) {
+                circleExtraInfo.value = JSON.parse(cachedExtra);
+              }
+            } catch (e) {
+              console.warn('Cache restore skipped:', e);
             }
-            const cachedExtra = localStorage.getItem(EVENT_CONFIG.storageKey('circle_info_cache'));
-            if (cachedExtra) {
-              circleExtraInfo.value = JSON.parse(cachedExtra);
-            }
-          } catch (e) {
-            console.warn('Cache restore skipped:', e);
           }
           window.addEventListener('online', () => {
             isOnline.value = true;
@@ -2940,13 +2989,19 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
           const urlParams = new URLSearchParams(window.location.search);
           const sharedListId = urlParams.get('list');
           
-          if (sharedListId) {
+          if (isTestMode) {
+            // ★ テストモード時はローカル専用キーからのみ復元し Supabase Auth / 同期を完全バイパス
+            const stored = localStorage.getItem(ACTIVE_STORAGE_KEY);
+            if (stored) {
+              try { savedList.value = JSON.parse(stored); syncFreeMemoFromState(); } catch (e) {}
+            }
+          } else if (sharedListId) {
             isReadOnly.value = true;
             activeTab.value = 'list';
             await loadSharedList(sharedListId);
           } else {
             // ★ Local-First: まずローカルストレージから即座に復元 (0ms・オフラインでも即時表示)
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = localStorage.getItem(ACTIVE_STORAGE_KEY);
             if (stored) {
               try { savedList.value = JSON.parse(stored); syncFreeMemoFromState(); } catch (e) {}
             }
@@ -2963,13 +3018,27 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
             }
           }
 
-          supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            const currentUser = session?.user || null;
-            user.value = currentUser;
-            if (currentUser && !isReadOnly.value && isOnline.value) loadCloudList(currentUser.id);
-          });
+          if (!isTestMode) {
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+              const currentUser = session?.user || null;
+              user.value = currentUser;
+              if (currentUser && !isReadOnly.value && isOnline.value) loadCloudList(currentUser.id);
+            });
+          }
 
           // ★ データの独立読み込み＆耐障害性向上 (data.json と Supabase を分離)
+          if (isTestMode) {
+            // テストモード: シード固定でダミー240件を自動生成し、本番データ・Supabaseには一切触れない
+            const mock = generateMockEventData({
+              mapCoords: mapCoordsData,
+              vspoList: vspoDict,
+              count: 240
+            });
+            circles.value = mock.circles;
+            blocks.value = mock.blocks;
+            circleExtraInfo.value = mock.extraInfo;
+            loading.value = false;
+          } else {
           // 1. 静的データ (/data.json) を最優先でロード (Service Workerプリキャッシュから一瞬で返却)
           try {
             const localRes = await fetch('/data.json');
@@ -3048,6 +3117,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
             } catch (error) { 
               console.warn('Supabase circle_info network error (offline fallback applied):', error); 
             }
+          }
           }
 
           // ★ お知らせ・タイムライン通知の初期ロード ＆ 30秒定期監視
@@ -3169,7 +3239,7 @@ import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from
         let saveTimeout = null;
         watch(savedList, (newVal) => {
           if (isReadOnly.value) return; 
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+          localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(newVal));
           saveToCloud(newVal);
         }, { deep: true });
 
