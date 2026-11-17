@@ -324,29 +324,44 @@
 
                 <div class="space-y-2">
                   <div v-for="(item, idx) in extra.items" :key="'it_' + idx + '_' + item.name"
-                       @click="!isReadOnly && (isItemSelected(item) ? null : $emit('changeItemQuantity', circle.circle_id, item, 1))"
+                       @click="!isReadOnly && !isItemSoldout(item) && (isItemSelected(item) ? null : $emit('changeItemQuantity', circle.circle_id, item, 1))"
                        class="p-2.5 md:p-3 rounded-xl border flex items-center justify-between transition select-none group"
                        :class="[
-                         isItemSelected(item) 
-                           ? 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-300/70 shadow-sm' 
-                           : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100 hover:border-gray-300',
-                         isReadOnly ? '' : (isItemSelected(item) ? '' : 'cursor-pointer')
+                         isItemSoldout(item)
+                           ? 'bg-gray-100/80 border-gray-200 opacity-70 cursor-not-allowed'
+                           : isItemSelected(item)
+                             ? 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-300/70 shadow-sm'
+                             : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100 hover:border-gray-300',
+                         (isReadOnly || isItemSoldout(item)) ? '' : (isItemSelected(item) ? '' : 'cursor-pointer')
                        ]">
                     
                     <div class="flex items-center gap-2.5 min-w-0 pr-2 flex-1">
-                      <!-- チェックボックストグル (タップで選択解除/1個追加) -->
+                      <!-- チェックボックストグル (タップで選択解除/1個追加、完売時は新規追加不可) -->
                       <button v-if="!isReadOnly"
                               type="button"
-                              @click.stop="$emit('toggleItem', circle.circle_id, item)"
-                              class="w-5 h-5 rounded flex items-center justify-center shrink-0 border transition cursor-pointer"
-                              :class="isItemSelected(item) ? 'bg-amber-500 border-amber-500 text-white shadow-2xs' : 'border-gray-300 bg-white group-hover:border-amber-400'"
-                              :title="isItemSelected(item) ? '選択を解除' : '1個追加'">
+                              :disabled="isItemSoldout(item) && !isItemSelected(item)"
+                              @click.stop="(!isItemSoldout(item) || isItemSelected(item)) && $emit('toggleItem', circle.circle_id, item)"
+                              class="w-5 h-5 rounded flex items-center justify-center shrink-0 border transition"
+                              :class="[
+                                isItemSoldout(item) && !isItemSelected(item)
+                                  ? 'border-gray-200 bg-gray-200 text-gray-400 cursor-not-allowed'
+                                  : isItemSelected(item)
+                                    ? 'bg-amber-500 border-amber-500 text-white shadow-2xs cursor-pointer'
+                                    : 'border-gray-300 bg-white group-hover:border-amber-400 cursor-pointer'
+                              ]"
+                              :title="isItemSoldout(item) && !isItemSelected(item) ? '完売' : (isItemSelected(item) ? '選択を解除' : '1個追加')">
                         <svg v-if="isItemSelected(item)" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                       </button>
                       <div v-else class="w-5 h-5 rounded flex items-center justify-center shrink-0 border"
                            :class="isItemSelected(item) ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-300 bg-white'">
                         <svg v-if="isItemSelected(item)" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                       </div>
+
+                      <!-- 完売バッジ -->
+                      <span v-if="isItemSoldout(item)"
+                            class="text-[10px] px-1.5 py-0.5 rounded font-black bg-rose-100 text-rose-700 border border-rose-200 shrink-0">
+                        完売
+                      </span>
 
                       <!-- 種類バッジ (新刊・既刊・特典など) -->
                       <span v-if="getItemBadge(item.name)" 
@@ -358,7 +373,7 @@
                       <!-- 商品名 ＆ 数量バッジ -->
                       <div class="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
                         <span class="text-xs md:text-sm font-bold leading-snug truncate"
-                              :class="isItemSelected(item) ? 'text-amber-950' : 'text-gray-800'">
+                              :class="isItemSoldout(item) ? 'line-through text-gray-500' : (isItemSelected(item) ? 'text-amber-950' : 'text-gray-800')">
                           {{ item.name }}
                         </span>
                         <span v-if="getItemQuantity(item) > 1"
@@ -384,8 +399,10 @@
                           {{ getItemQuantity(item) }}
                         </span>
                         <button type="button"
-                                @click.stop="$emit('changeItemQuantity', circle.circle_id, item, 1)"
-                                class="w-6 h-6 rounded bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold flex items-center justify-center text-xs transition cursor-pointer"
+                                :disabled="isItemSoldout(item)"
+                                @click.stop="!isItemSoldout(item) && $emit('changeItemQuantity', circle.circle_id, item, 1)"
+                                class="w-6 h-6 rounded font-bold flex items-center justify-center text-xs transition"
+                                :class="isItemSoldout(item) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-white cursor-pointer'"
                                 title="1個増やす">
                           ＋
                         </button>
@@ -394,7 +411,7 @@
                       <!-- 価格表示 (単価 / 複数個の場合は小計も表示) -->
                       <div class="text-right min-w-[56px]">
                         <div class="font-bold text-xs md:text-sm font-mono leading-tight"
-                             :class="item.price > 0 ? (isItemSelected(item) ? 'text-amber-800' : 'text-gray-900') : 'text-green-600'">
+                             :class="isItemSoldout(item) ? 'line-through text-gray-400' : (item.price > 0 ? (isItemSelected(item) ? 'text-amber-800' : 'text-gray-900') : 'text-green-600')">
                           {{ item.price > 0 ? '¥' + (item.price * (getItemQuantity(item) || 1)).toLocaleString() : '無料' }}
                         </div>
                         <div v-if="getItemQuantity(item) > 1 && item.price > 0" class="text-[9.5px] text-amber-600 font-mono mt-0.5">
@@ -536,6 +553,11 @@
 import { ref, computed, watch } from 'vue';
 import ImageViewerModal from './ImageViewerModal.vue';
 import { getItemBadge } from '../utils/badges';
+
+const isItemSoldout = (item) => {
+  if (!item) return false;
+  return Boolean(item.soldout || String(item.note || '').trim() === '完売');
+};
 import { getMemberStyle, getMemberMark } from '../utils/memberStyle';
 import { priorityColors } from '../constants';
 import { getCircleOfficialSearchUrl, getCirclePublicSearchUrl, cleanTwitterHandle, parseTwitterHandles, getCircleAuthorTwitterIds, getCircleStaffTwitterIds, getCircleAuthorAccounts, getCircleStaffAccounts, parseOshinagakiUrls, parseOshinagakiUrlType } from '../utils/xSearch';

@@ -482,6 +482,9 @@
             <span>⏰ 準備・予定</span>
             <span v-if="timelineEvents.length > 0" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-mono font-bold shadow-xs">{{ timelineEvents.length }}</span>
           </button>
+          <button @click="activeTab = 'prep'" :class="activeTab === 'prep' ? 'border-teal-600 text-teal-700 bg-teal-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
+            <span>🛠️ サークル準備</span>
+          </button>
           <button v-if="isCircleModeEnabled" @click="activeTab = 'register'" :class="activeTab === 'register' ? 'border-amber-500 text-amber-800 bg-amber-50/70' : 'border-transparent text-gray-500 hover:bg-gray-50'" class="flex-1 py-3 border-b-2 font-extrabold text-sm transition-colors flex justify-center items-center gap-1.5 cursor-pointer">
             <span>🏪 レジ ({{ registerCircle.space_sym }}-{{ registerCircle.space_num }})</span>
             <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">{{ registerCircle.circle_name }}</span>
@@ -1722,6 +1725,14 @@
             @jump-to-map="jumpToMap"
           />
 
+          <!-- =========================================
+               サークル向け「準備」ビュー（入稿目安カレンダー等の箱）
+          ========================================== -->
+          <CirclePrepPanel
+            v-show="activeTab === 'prep'"
+            :is-test-mode="isTestMode"
+          />
+
         </div>
 
         <!-- =========================================
@@ -1769,6 +1780,11 @@
         <span v-if="timelineEvents.length > 0" class="absolute top-1 right-2.5 px-1 min-w-[17px] h-4 bg-emerald-600 text-white rounded-full text-[9px] font-mono font-bold flex items-center justify-center shadow-xs">
           {{ timelineEvents.length }}
         </span>
+      </button>
+      <button @click="activeTab = 'prep'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'prep' ? 'text-teal-600 font-extrabold bg-teal-50/50' : 'text-gray-500 hover:text-gray-800'">
+        <span v-if="activeTab === 'prep'" class="absolute top-0 inset-x-4 h-0.5 bg-teal-600 rounded-b-full"></span>
+        <span class="text-base leading-none">🛠️</span>
+        <span class="text-[11px] tracking-tight">サークル</span>
       </button>
       <button v-if="isCircleModeEnabled" @click="activeTab = 'register'" class="flex-1 min-h-[54px] py-2 flex flex-col items-center justify-center gap-0.5 transition-colors relative cursor-pointer" :class="activeTab === 'register' ? 'text-amber-600 font-extrabold bg-amber-50/60' : 'text-gray-500 hover:text-gray-800'">
         <span v-if="activeTab === 'register'" class="absolute top-0 inset-x-4 h-0.5 bg-amber-500 rounded-b-full"></span>
@@ -1865,6 +1881,7 @@ import NotificationModal from './components/NotificationModal.vue';
 import PwaUpdateToast from './components/PwaUpdateToast.vue';
 import CircleRegisterPanel from './components/CircleRegisterPanel.vue';
 import CircleAuthModal from './components/CircleAuthModal.vue';
+import CirclePrepPanel from './components/CirclePrepPanel.vue';
 import TestModeToolsPanel from './components/TestModeToolsPanel.vue';
 import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
