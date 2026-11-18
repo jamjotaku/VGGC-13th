@@ -101,12 +101,12 @@ export const EVENT_CONFIG = {
     return `${this.slug}_${suffix}`;
   },
 
-  // 簡易POSレジ設定（v1互換 / v2汎用化で拡張予定）
+  // 簡易POSレジ設定（v2汎用化済み: 12th互換の固定デフォルトは無効化）
   register: {
-    defaultCircleId: '10ebdde686d91dfe1ab4a63376c7b377',
-    defaultCircleName: 'Black Stance',
-    defaultCircleSpace: 'M-15-16',
-    unlockedEmailPrefixes: ['jamj__otaku@']
+    defaultCircleId: '',
+    defaultCircleName: '',
+    defaultCircleSpace: '',
+    unlockedEmailPrefixes: []
   },
 
   // デフォルト初期アナウンス (Supabase未接続時やオフライン時の安全フォールバック)

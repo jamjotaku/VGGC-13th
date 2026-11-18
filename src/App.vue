@@ -3842,12 +3842,13 @@ import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, ge
 
         const registerCircle = computed(() => {
           const targetId = activeRegisterCircleId.value;
-          const [fallbackSym, ...fallbackNumParts] = EVENT_CONFIG.register.defaultCircleSpace.split('-');
+          const defaultSpace = EVENT_CONFIG.register.defaultCircleSpace || '';
+          const [fallbackSym, ...fallbackNumParts] = defaultSpace ? defaultSpace.split('-') : ['', ''];
           return circles.value.find(c => c.circle_id === targetId) || {
             circle_id: targetId,
-            circle_name: EVENT_CONFIG.register.defaultCircleName,
-            space_sym: fallbackSym || 'M',
-            space_num: fallbackNumParts.join('-') || '15-16',
+            circle_name: EVENT_CONFIG.register.defaultCircleName || '',
+            space_sym: fallbackSym || '',
+            space_num: fallbackNumParts.join('-') || '',
             penname: ''
           };
         });
