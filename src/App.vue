@@ -255,11 +255,6 @@
                     {{ EVENT_CONFIG.name }}（{{ EVENT_CONFIG.venue }}）の正式配置図が公開され次第、マップと巡回ルート機能を有効化します。
                   </p>
                 </div>
-                <a v-if="ENABLE_TEST_MODE"
-                   href="?mode=test"
-                   class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold transition">
-                  🧪 テストモードでマップ・ルートを試す
-                </a>
               </div>
               <img v-else-if="!isMapImageError"
                    src="/map.jpg"
@@ -639,11 +634,6 @@
                           {{ EVENT_CONFIG.name }} の正式配置図が公開され次第、マップ・巡回ルート機能を有効化します。
                         </p>
                       </div>
-                      <a v-if="ENABLE_TEST_MODE"
-                         href="?mode=test"
-                         class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold transition">
-                        🧪 テストモードでマップを試す
-                      </a>
                     </div>
                     <img v-else-if="!isMapImageError"
                     src="/map.jpg"
@@ -1055,11 +1045,6 @@
                           class="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition cursor-pointer">
                     🛠️ サークル準備を見る
                   </button>
-                  <a v-if="ENABLE_TEST_MODE"
-                     href="?mode=test"
-                     class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold rounded-xl transition">
-                    🧪 テストモードで機能を試す
-                  </a>
                 </div>
               </div>
             </div>

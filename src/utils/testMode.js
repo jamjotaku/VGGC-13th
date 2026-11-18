@@ -7,6 +7,23 @@ export const ENABLE_TEST_MODE = true;
 
 const TEST_SESSION_KEY = 'vggc13th_test_mode_active';
 const TEST_STORAGE_PREFIX = 'vggc13th_test_';
+const TEST_KEY_DIGEST = '5f68309d-05e7a904';
+
+function fnv1a32(str, seed) {
+  let hash = seed >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+export function verifyTestModeKey(rawKey) {
+  if (!rawKey) return false;
+  const k = String(rawKey).trim();
+  const digest = `${fnv1a32(`vggc13:${k}`, 0x811c9dc5)}-${fnv1a32(`${k}:salt2`, 0x9e3779b9)}`;
+  return digest === TEST_KEY_DIGEST;
+}
 
 export function isTestModeActive() {
   if (!ENABLE_TEST_MODE || typeof window === 'undefined') {
@@ -17,8 +34,13 @@ export function isTestModeActive() {
     const params = new URLSearchParams(window.location.search);
     const modeParam = params.get('mode');
     if (modeParam === 'test') {
-      window.sessionStorage.setItem(TEST_SESSION_KEY, '1');
-      return true;
+      const keyParam = params.get('key');
+      if (verifyTestModeKey(keyParam)) {
+        window.sessionStorage.setItem(TEST_SESSION_KEY, '1');
+        return true;
+      }
+      window.sessionStorage.removeItem(TEST_SESSION_KEY);
+      return false;
     }
     if (modeParam === 'normal' || modeParam === 'exit') {
       window.sessionStorage.removeItem(TEST_SESSION_KEY);

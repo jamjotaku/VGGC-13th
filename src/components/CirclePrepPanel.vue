@@ -66,11 +66,6 @@
           <span class="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-600 text-[11px] font-bold">
             📌 スキーマ待機中（schema v{{ deadlineData.schemaVersion }}）
           </span>
-          <a v-if="enableTestMode && !isTestMode"
-             href="?mode=test"
-             class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-extrabold transition">
-            🧪 テストモードで挙動をプレビューする
-          </a>
         </div>
       </div>
 
