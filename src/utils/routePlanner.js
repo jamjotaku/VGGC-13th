@@ -590,12 +590,7 @@ export function calculatePatrolRoute(routeData, targetPins = [], options = {}) {
       const numberedIds = new Set(numberedGroup.map(it => it.circle_id));
       const unnumberedGroup = group.filter(it => !numberedIds.has(it.circle_id));
 
-      if (numberedGroup.length > 0) {
-        orderedItems.push(...numberedGroup);
-        currentAnchorId = numberedGroup[numberedGroup.length - 1].accessNodeId;
-      }
-
-      if (unnumberedGroup.length > 0) {
+      if (numberedGroup.length === 0) {
         const tierOrdered = solveGroupOrder(
           unnumberedGroup,
           currentAnchorId,
@@ -605,6 +600,56 @@ export function calculatePatrolRoute(routeData, targetPins = [], options = {}) {
         orderedItems.push(...tierOrdered);
         if (tierOrdered.length > 0) {
           currentAnchorId = tierOrdered[tierOrdered.length - 1].accessNodeId;
+        }
+      } else {
+        // 順位スロット固定方式:
+        // 指定された priorityOrder (#1, #2...) を該当スロット位置に予約固定し、
+        // 空いているスロットを未指定サークルの最短順で埋める（片側だけの #2 指定も直感通りに動作する）
+        const slots = new Array(group.length).fill(null);
+
+        numberedGroup.forEach((it) => {
+          const preferredIdx = Math.min(group.length - 1, Math.max(0, Number(it.priorityOrder) - 1));
+          if (slots[preferredIdx] === null) {
+            slots[preferredIdx] = it;
+            return;
+          }
+          // 同じ番号が重複している場合は後ろ側の空きスロット、無ければ手前の空きスロットへ配置
+          let placed = false;
+          for (let i = preferredIdx + 1; i < group.length; i++) {
+            if (slots[i] === null) {
+              slots[i] = it;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            for (let i = preferredIdx - 1; i >= 0; i--) {
+              if (slots[i] === null) {
+                slots[i] = it;
+                break;
+              }
+            }
+          }
+        });
+
+        const tierUnnumberedOrdered = unnumberedGroup.length > 0
+          ? solveGroupOrder(
+              unnumberedGroup,
+              currentAnchorId,
+              distMatrix,
+              isLastTier && returnToEntrance ? entranceNodeId : null
+            )
+          : [];
+
+        let uIdx = 0;
+        const combinedTier = slots.map((slotItem) => {
+          if (slotItem !== null) return slotItem;
+          return tierUnnumberedOrdered[uIdx++];
+        }).filter(Boolean);
+
+        orderedItems.push(...combinedTier);
+        if (combinedTier.length > 0) {
+          currentAnchorId = combinedTier[combinedTier.length - 1].accessNodeId;
         }
       }
     });

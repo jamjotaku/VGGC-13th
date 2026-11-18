@@ -1457,13 +1457,13 @@
                     <!-- 中段: 選択した頒布物 ＆ メモ表示 (ある場合のみ) -->
                     <div v-if="savedList[circle.circle_id].selectedItems?.length || savedList[circle.circle_id].memo"
                          class="flex flex-wrap items-center gap-1.5 text-xs bg-amber-50/60 border border-amber-200/80 rounded-xl px-2.5 py-1.5">
-                      <span v-for="itName in (savedList[circle.circle_id].selectedItems || [])" :key="'cmp_it_'+itName"
+                      <span v-for="itKey in (savedList[circle.circle_id].selectedItems || [])" :key="'cmp_it_'+itKey"
                             class="bg-white text-amber-950 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] font-bold flex items-center gap-1">
                         <span class="text-amber-600 font-black">✓</span>
-                        <span>{{ itName }}</span>
-                        <span v-if="(savedList[circle.circle_id].itemQuantities?.[itName] || 1) > 1"
+                        <span>{{ getCircleItemDisplayName(itKey, circleExtraInfo[circle.circle_id]?.items) }}</span>
+                        <span v-if="(savedList[circle.circle_id].itemQuantities?.[itKey] || 1) > 1"
                               class="px-1 py-0.2 bg-amber-500 text-white rounded text-[10px] font-mono font-black">
-                          ×{{ savedList[circle.circle_id].itemQuantities[itName] }}
+                          ×{{ savedList[circle.circle_id].itemQuantities[itKey] }}
                         </span>
                       </span>
                       <span v-if="savedList[circle.circle_id].memo" class="text-gray-800 text-[11px] font-medium break-all">
@@ -1605,13 +1605,13 @@
                           <span class="text-[10px] text-amber-700 underline">変更する</span>
                         </div>
                         <div class="flex flex-wrap gap-1.5">
-                          <span v-for="itName in savedList[circle.circle_id].selectedItems" :key="itName" 
+                          <span v-for="itKey in savedList[circle.circle_id].selectedItems" :key="itKey" 
                                 class="text-xs bg-white text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-sm">
                             <span class="text-amber-600 font-black">✓</span>
-                            <span>{{ itName }}</span>
-                            <span v-if="(savedList[circle.circle_id].itemQuantities?.[itName] || 1) > 1"
+                            <span>{{ getCircleItemDisplayName(itKey, circleExtraInfo[circle.circle_id]?.items) }}</span>
+                            <span v-if="(savedList[circle.circle_id].itemQuantities?.[itKey] || 1) > 1"
                                   class="px-1.5 py-0.2 bg-amber-500 text-white rounded-md text-[10px] font-mono font-black">
-                              ×{{ savedList[circle.circle_id].itemQuantities[itName] }}
+                              ×{{ savedList[circle.circle_id].itemQuantities[itKey] }}
                             </span>
                           </span>
                         </div>
@@ -1885,6 +1885,7 @@ import CirclePrepPanel from './components/CirclePrepPanel.vue';
 import TestModeToolsPanel from './components/TestModeToolsPanel.vue';
 import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
+import { getCircleItemKey, getCircleItemDisplayName, resolveSavedItemKey, calculateSelectedItemsTotal } from './utils/itemKey';
 import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventData } from './utils/testMode';
 
         const isTestMode = isTestModeActive();
@@ -2565,7 +2566,14 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
           return saved.selectedItems.reduce((acc, name) => acc + (qMap[name] || 1), 0);
         };
 
-        const toggleItemSelection = (circleId, item) => {
+        const resolveTargetItemIndex = (items, item, itemIndex) => {
+          if (Number.isInteger(itemIndex) && itemIndex >= 0) return itemIndex;
+          const byRef = items.indexOf(item);
+          if (byRef > -1) return byRef;
+          return items.findIndex(it => it.name === item?.name && Number(it.price) === Number(item?.price));
+        };
+
+        const toggleItemSelection = (circleId, item, itemIndex = null) => {
           if (isReadOnly.value) return;
           
           if (!savedList.value[circleId]) {
@@ -2575,6 +2583,7 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
               soldout: false,
               price: '',
               priority: '',
+              priorityOrder: null,
               forWho: '',
               selectedItems: [],
               itemQuantities: {}
@@ -2584,28 +2593,26 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
           if (!saved.selectedItems) saved.selectedItems = [];
           if (!saved.itemQuantities) saved.itemQuantities = {};
 
-          const idx = saved.selectedItems.indexOf(item.name);
-          if (idx > -1) {
-            saved.selectedItems.splice(idx, 1);
-            delete saved.itemQuantities[item.name];
+          const items = circleExtraInfo.value[circleId]?.items || [];
+          const resolvedIdx = resolveTargetItemIndex(items, item, itemIndex);
+          const itemKey = getCircleItemKey(item, resolvedIdx);
+          const existingKey = resolveSavedItemKey(saved, item, resolvedIdx);
+
+          if (existingKey) {
+            const idx = saved.selectedItems.indexOf(existingKey);
+            if (idx > -1) saved.selectedItems.splice(idx, 1);
+            delete saved.itemQuantities[existingKey];
           } else {
-            saved.selectedItems.push(item.name);
-            saved.itemQuantities[item.name] = 1;
+            saved.selectedItems.push(itemKey);
+            saved.itemQuantities[itemKey] = 1;
           }
 
-          // 金額の自動再計算 (単価 × 個数)
-          const items = circleExtraInfo.value[circleId]?.items || [];
-          const total = items
-            .filter(it => saved.selectedItems.includes(it.name))
-            .reduce((sum, it) => {
-              const q = saved.itemQuantities[it.name] || 1;
-              return sum + (Number(it.price) || 0) * q;
-            }, 0);
-          
+          // 金額の自動再計算 (個体キー・旧名前キー両対応)
+          const total = calculateSelectedItemsTotal(items, saved);
           saved.price = total > 0 ? total : '';
         };
 
-        const changeItemQuantity = (circleId, item, delta) => {
+        const changeItemQuantity = (circleId, item, delta, itemIndex = null) => {
           if (isReadOnly.value) return;
 
           if (!savedList.value[circleId]) {
@@ -2615,6 +2622,7 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
               soldout: false,
               price: '',
               priority: '',
+              priorityOrder: null,
               forWho: '',
               selectedItems: [],
               itemQuantities: {}
@@ -2624,29 +2632,36 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
           if (!saved.selectedItems) saved.selectedItems = [];
           if (!saved.itemQuantities) saved.itemQuantities = {};
 
-          const currentQty = saved.itemQuantities[item.name] || (saved.selectedItems.includes(item.name) ? 1 : 0);
+          const items = circleExtraInfo.value[circleId]?.items || [];
+          const resolvedIdx = resolveTargetItemIndex(items, item, itemIndex);
+          const itemKey = getCircleItemKey(item, resolvedIdx);
+          const existingKey = resolveSavedItemKey(saved, item, resolvedIdx);
+
+          const currentQty = existingKey
+            ? (Number(saved.itemQuantities[existingKey]) || 1)
+            : 0;
           const newQty = Math.max(0, currentQty + delta);
 
-          if (newQty === 0) {
-            const idx = saved.selectedItems.indexOf(item.name);
-            if (idx > -1) saved.selectedItems.splice(idx, 1);
-            delete saved.itemQuantities[item.name];
-          } else {
-            if (!saved.selectedItems.includes(item.name)) {
-              saved.selectedItems.push(item.name);
-            }
-            saved.itemQuantities[item.name] = newQty;
+          // 旧名前キーで保持されていた場合は操作時に新個体キーへ移行する
+          if (existingKey && existingKey !== itemKey) {
+            const oldIdx = saved.selectedItems.indexOf(existingKey);
+            if (oldIdx > -1) saved.selectedItems.splice(oldIdx, 1);
+            delete saved.itemQuantities[existingKey];
           }
 
-          // 金額の自動再計算 (単価 × 個数)
-          const items = circleExtraInfo.value[circleId]?.items || [];
-          const total = items
-            .filter(it => saved.selectedItems.includes(it.name))
-            .reduce((sum, it) => {
-              const q = saved.itemQuantities[it.name] || 1;
-              return sum + (Number(it.price) || 0) * q;
-            }, 0);
+          if (newQty === 0) {
+            const idx = saved.selectedItems.indexOf(itemKey);
+            if (idx > -1) saved.selectedItems.splice(idx, 1);
+            delete saved.itemQuantities[itemKey];
+          } else {
+            if (!saved.selectedItems.includes(itemKey)) {
+              saved.selectedItems.push(itemKey);
+            }
+            saved.itemQuantities[itemKey] = newQty;
+          }
 
+          // 金額の自動再計算 (個体キー・旧名前キー両対応)
+          const total = calculateSelectedItemsTotal(items, saved);
           saved.price = total > 0 ? total : '';
         };
 
@@ -3289,7 +3304,10 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
 
         const onPriorityChange = (circleId) => {
           const item = savedList.value[circleId];
-          if (item && !item.priority) {
+          if (!item) return;
+          if (!item.priority) {
+            item.priorityOrder = null;
+          } else if (item.priorityOrder === undefined) {
             item.priorityOrder = null;
           }
         };
@@ -3363,9 +3381,11 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
             const who = data.forWho ? ` @${data.forWho}` : '';
             text += `${status} ${c.space_sym}-${c.space_num} ${c.circle_name} ${prio}${price}${who}\n`;
             if (data.selectedItems && data.selectedItems.length > 0) {
-              const itemDetails = data.selectedItems.map(name => {
-                const q = data.itemQuantities?.[name] || 1;
-                return q > 1 ? `${name} ×${q}` : name;
+              const cItems = circleExtraInfo.value[c.circle_id]?.items || [];
+              const itemDetails = data.selectedItems.map(key => {
+                const label = getCircleItemDisplayName(key, cItems);
+                const q = data.itemQuantities?.[key] || 1;
+                return q > 1 ? `${label} ×${q}` : label;
               });
               text += `  品名: ${itemDetails.join(', ')}\n`;
             }
