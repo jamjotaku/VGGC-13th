@@ -110,6 +110,18 @@ const STANDALONE_POOL = [
 const EN_PREFIX_POOL = ['Starlight', 'Midnight', 'Velvet', 'Cyber', 'Azure', 'Pastel', 'Astral', 'Lunar'];
 const EN_SUFFIX_POOL = ['Atelier', 'Works', 'Press', 'Studio', 'Garden', 'Archive', 'Lab', 'Factory'];
 
+// 固定枠8件の予約名（生成分との重複防止用・仕様 v2）
+const RESERVED_FIXED_NAMES = new Set([
+  '星屑完売堂',
+  '深夜喫茶',
+  '月夜残りわずか工房',
+  '極彩大所帯12品ラボ',
+  '硝子画像リンク欠落軒',
+  'しろつめくさ無配屋',
+  '紙飛行機合同印刷部',
+  '彗星豪華セット本舗'
+]);
+
 // ==========================================
 // 2. ペンネームプール（造語）
 // ==========================================
@@ -267,8 +279,8 @@ export function generateMockEventData({
       circleName = '【目玉01】星屑完売堂';
       circleKana = 'ホシクズカンバイドウ';
       items = [
-        { name: `${mainMember} おでかけ 新刊イラスト本`, price: 1000, note: '完売' },
-        { name: `${mainMember} アクリルスタンド`, price: 1500, note: '完売' }
+        { name: `${mainMember} おでかけ 新刊イラスト本`, price: 1000, note: '完売', soldout: true },
+        { name: `${mainMember} アクリルスタンド`, price: 1500, note: '完売', soldout: true }
       ];
       tags.push('全品完売', '完売');
       oshinagakiUrl = '/icons/icon.svg';
@@ -354,14 +366,29 @@ export function generateMockEventData({
         circleName = `${ep} ${es}`;
         circleKana = circleName;
       } else if (rng() < 0.2) {
-        const [stName, stKana] = pick(STANDALONE_POOL);
-        circleName = stName;
-        circleKana = stKana;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const [stName, stKana] = pick(STANDALONE_POOL);
+          if (!RESERVED_FIXED_NAMES.has(stName)) {
+            circleName = stName;
+            circleKana = stKana;
+            break;
+          }
+        }
       } else {
-        const [pName, pKana] = pick(PREFIX_POOL);
-        const [sName, sKana] = pick(SUFFIX_POOL);
-        circleName = `${pName}${sName}`;
-        circleKana = `${pKana}${sKana}`;
+        for (let attempt = 0; attempt < 12; attempt++) {
+          const [pName, pKana] = pick(PREFIX_POOL);
+          const [sName, sKana] = pick(SUFFIX_POOL);
+          const candidate = `${pName}${sName}`;
+          if (!RESERVED_FIXED_NAMES.has(candidate)) {
+            circleName = candidate;
+            circleKana = `${pKana}${sKana}`;
+            break;
+          }
+        }
+        if (!circleName) {
+          circleName = `テスト生成サークル${idx + 1}`;
+          circleKana = `テストセイセイサークル${idx + 1}`;
+        }
       }
 
       if (isLongName) {
@@ -414,6 +441,7 @@ export function generateMockEventData({
         items.push({
           name: itemName,
           price,
+          soldout: itemSoldout,
           note: itemSoldout ? '完売' : (price === 0 ? '無料配布' : '')
         });
       }

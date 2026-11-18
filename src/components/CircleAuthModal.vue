@@ -129,47 +129,11 @@
                 </button>
               </div>
 
-              <!-- タブA：確認コード付きポストURLによる完全無料本人確認 -->
+              <!-- タブA：サークル主認証（DM確認・ポストURL認証の対等な2択） -->
               <div v-if="mode === 'owner'" class="space-y-3">
-                <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-950 space-y-1 leading-relaxed">
-                  <div class="font-extrabold">🔒 アプリ連携なし・0円本人確認の手順</div>
-                  <ol class="list-decimal list-inside space-y-0.5 text-blue-900">
-                    <li>下の「確認コード」を含めて自分の X でポスト（認証後は削除OK）</li>
-                    <li>自分のサークルを選択し、そのポストの URL を貼って確認</li>
-                  </ol>
-                  <p class="text-[10px] text-blue-700 pt-0.5">※ 非公開（鍵）アカウントの場合は運営へ個別申請ください。</p>
-                </div>
-
-                <!-- Step 1: ワンタイム確認コード -->
-                <div class="p-3 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-extrabold text-gray-700">Step 1. 確認コード</span>
-                    <button @click="refreshVerifyCode"
-                            type="button"
-                            class="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
-                      再生成
-                    </button>
-                  </div>
-                  <div class="flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-3 py-2">
-                    <span class="font-mono font-black text-sm text-gray-900 flex-1 tracking-wider">{{ verifyCode }}</span>
-                    <button @click="copyText(verifyCode, 'verify')"
-                            type="button"
-                            class="px-2.5 py-1 rounded-lg bg-gray-800 text-white text-[11px] font-bold cursor-pointer">
-                      {{ copiedKey === 'verify' ? '✓ コピー済' : 'コピー' }}
-                    </button>
-                  </div>
-                  <a :href="xPostIntentUrl"
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     class="w-full min-h-[38px] px-3 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition">
-                    <span>𝕏</span>
-                    <span>確認用ポストを作成する</span>
-                  </a>
-                </div>
-
-                <!-- Step 2: サークル検索＆選択 -->
+                <!-- Step 1: サークル検索＆選択（両ルート共通） -->
                 <div class="space-y-1.5">
-                  <label class="text-xs font-extrabold text-gray-700 block">Step 2. 自分のサークルを選択</label>
+                  <label class="text-xs font-extrabold text-gray-700 block">Step 1. 自分のサークルを選択</label>
                   <input type="text"
                          v-model="circleSearch"
                          placeholder="スペース番号やサークル名で検索 (例: M-15, Black)"
@@ -191,58 +155,145 @@
                   </div>
                 </div>
 
-                <!-- Step 3: ポストURL入力＆検証 -->
+                <!-- Step 2: 認証方法の2択カード（対等な正規ルート） -->
                 <div class="space-y-1.5">
-                  <label class="text-xs font-extrabold text-gray-700 block">Step 3. ポストのURLを貼り付け</label>
-                  <input type="url"
-                         v-model="postUrlInput"
-                         placeholder="https://x.com/your_id/status/123456789..."
-                         class="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-
-                <button @click="verifyOwnerByPostUrl"
-                        :disabled="!isOnline || isProcessing || !postUrlInput.trim() || !selectedCircleId"
-                        type="button"
-                        class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs md:text-sm font-extrabold shadow-sm cursor-pointer transition">
-                  {{ isProcessing ? '公開ポストを確認中...' : 'ポストURLで本人確認を実行' }}
-                </button>
-
-                <!-- 認証の保険：鍵垢・ポスト不可向け 個別申請アコーディオン -->
-                <div class="pt-2 border-t border-gray-200">
-                  <button type="button"
-                          @click="showFallbackRequest = !showFallbackRequest"
-                          class="w-full text-left text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-between py-1 cursor-pointer">
-                    <span>🔒 非公開（鍵）アカウント・公開ポストが難しい方はこちら</span>
-                    <span>{{ showFallbackRequest ? '▲' : '▼' }}</span>
-                  </button>
-
-                  <div v-if="showFallbackRequest" class="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-                    <p class="text-[11px] text-slate-600 leading-relaxed">
-                      鍵垢などで公開ポスト認証ができない場合は、運営側で個別確認のうえ認証します。上の「Step 2」でサークルを選択し、連絡可能な X ID を入力して申請してください。
-                    </p>
-                    <input type="text"
-                           v-model="fallbackXHandle"
-                           placeholder="あなたの X ID (例: @your_circle_x)"
-                           class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-slate-400">
-                    <input type="text"
-                           v-model="fallbackNote"
-                           placeholder="補足メモ（任意：鍵垢のため、別名義など）"
-                           class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-slate-400">
+                  <div class="text-xs font-extrabold text-gray-700">Step 2. 本人確認の方法を選択</div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button type="button"
-                            @click="submitFallbackRequest"
-                            :disabled="!isOnline || isProcessing || !selectedCircleId || !fallbackXHandle.trim()"
-                            class="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:bg-gray-300 text-white text-xs font-extrabold cursor-pointer transition">
-                      個別認証を申請する
+                            @click="ownerAuthMethod = 'dm'"
+                            class="text-left p-3 rounded-2xl border-2 transition cursor-pointer space-y-1"
+                            :class="ownerAuthMethod === 'dm' ? 'border-emerald-500 bg-emerald-50/70 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300'">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-xs font-black text-gray-900">💬 DMで運営確認</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-bold">ポスト不要</span>
+                      </div>
+                      <p class="text-[11px] text-gray-600 leading-snug">
+                        受付番号を発行し、運営XへDMで送るだけ（鍵垢OK・TLに残りません）
+                      </p>
                     </button>
 
-                    <div v-if="submittedRequestCode" class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 space-y-1">
-                      <div class="font-extrabold">✅ 申請を受け付けました！</div>
-                      <div>受付番号: <span class="font-mono font-black text-sm">{{ submittedRequestCode }}</span></div>
-                      <p class="text-emerald-800">
-                        なりすまし防止のため、本人確認として運営 X<span v-if="EVENT_CONFIG.adminContactX">（{{ EVENT_CONFIG.adminContactX }}）</span>へ上記の受付番号をご連絡ください。確認後、自動でレジ権限が付与されます。
+                    <button type="button"
+                            @click="ownerAuthMethod = 'post'"
+                            class="text-left p-3 rounded-2xl border-2 transition cursor-pointer space-y-1"
+                            :class="ownerAuthMethod === 'post' ? 'border-blue-500 bg-blue-50/70 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300'">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-xs font-black text-gray-900">📝 ポストURLで認証</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white font-bold">即時自動</span>
+                      </div>
+                      <p class="text-[11px] text-gray-600 leading-snug">
+                        確認コード付きポストURLを貼って即時認証（任意・認証後は削除可）
                       </p>
-                    </div>
+                    </button>
                   </div>
+                </div>
+
+                <!-- 方法A：DM＋運営確認ルート（正規ルート） -->
+                <div v-if="ownerAuthMethod === 'dm'" class="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-2.5">
+                  <div class="text-[11px] text-emerald-950 font-bold leading-relaxed">
+                    公開ポストは不要です。申請して受付番号（<span class="font-mono">REQ-...</span>）を発行し、運営X<span v-if="EVENT_CONFIG.adminContactX">（{{ EVENT_CONFIG.adminContactX }}）</span>へ DM でお伝えください。
+                  </div>
+
+                  <input type="text"
+                         v-model="fallbackXHandle"
+                         placeholder="あなたの X ID (例: @your_circle_x)"
+                         class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+                  <input type="text"
+                         v-model="fallbackNote"
+                         placeholder="補足メモ（任意：別名義、複数スペースなど）"
+                         class="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+
+                  <button type="button"
+                          @click="submitFallbackRequest"
+                          :disabled="!isOnline || isProcessing || !selectedCircleId || !fallbackXHandle.trim()"
+                          class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white text-xs md:text-sm font-extrabold shadow-sm cursor-pointer transition">
+                    {{ isProcessing ? '申請送信中...' : '受付番号（REQ-）を発行して申請する' }}
+                  </button>
+
+                  <div v-if="submittedRequestCode" class="p-3 rounded-xl bg-white border-2 border-emerald-400 text-[11px] text-emerald-950 space-y-2 shadow-2xs">
+                    <div class="font-extrabold text-emerald-800">✅ 申請を受け付けました！次の2ステップで完了します</div>
+
+                    <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                      <div class="flex-1 min-w-0">
+                        <div class="text-[10px] text-emerald-700 font-bold">受付番号</div>
+                        <div class="font-mono font-black text-sm text-gray-900">{{ submittedRequestCode }}</div>
+                      </div>
+                      <button type="button"
+                              @click="copyText(submittedRequestCode, 'req_code')"
+                              class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold cursor-pointer shrink-0">
+                        {{ copiedKey === 'req_code' ? '✓ コピー済' : '番号コピー' }}
+                      </button>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2">
+                      <button type="button"
+                              @click="copyText(dmTemplateText, 'dm_msg')"
+                              class="flex-1 py-2 px-3 rounded-xl bg-gray-800 hover:bg-gray-900 text-white text-[11px] font-bold cursor-pointer transition">
+                        {{ copiedKey === 'dm_msg' ? '✓ DM用文面をコピー済' : '📋 DM用文面をコピー' }}
+                      </button>
+                      <a v-if="adminXProfileUrl"
+                         :href="adminXProfileUrl"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         class="flex-1 py-2 px-3 rounded-xl bg-black hover:bg-neutral-800 text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition">
+                        <span>𝕏</span>
+                        <span>{{ EVENT_CONFIG.adminContactX }} へDMを送る ↗</span>
+                      </a>
+                    </div>
+
+                    <p class="text-[10px] text-gray-600">
+                      ※ 運営がDMと受付番号を確認して承認すると、自動でサークルレジ権限が付与されます。
+                    </p>
+                  </div>
+                </div>
+
+                <!-- 方法B：確認コード付きポストURLによる即時自動認証（任意ルート） -->
+                <div v-else class="p-3.5 rounded-2xl bg-blue-50/40 border border-blue-200 space-y-2.5">
+                  <div class="text-[11px] text-blue-950 leading-relaxed">
+                    <span class="font-extrabold">⚡ 即時自動認証（任意）:</span> 下の確認コードを含めて X でポストし、そのURLを貼ると運営確認なしで即座に認証できます（認証後はポスト削除OK）。
+                  </div>
+
+                  <!-- Step 1: ワンタイム確認コード -->
+                  <div class="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-xs font-extrabold text-gray-700">確認コード</span>
+                      <button @click="refreshVerifyCode"
+                              type="button"
+                              class="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+                        再生成
+                      </button>
+                    </div>
+                    <div class="flex items-center gap-2 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2">
+                      <span class="font-mono font-black text-sm text-gray-900 flex-1 tracking-wider">{{ verifyCode }}</span>
+                      <button @click="copyText(verifyCode, 'verify')"
+                              type="button"
+                              class="px-2.5 py-1 rounded-lg bg-gray-800 text-white text-[11px] font-bold cursor-pointer">
+                        {{ copiedKey === 'verify' ? '✓ コピー済' : 'コピー' }}
+                      </button>
+                    </div>
+                    <a :href="xPostIntentUrl"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="w-full min-h-[38px] px-3 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition">
+                      <span>𝕏</span>
+                      <span>確認用ポストを作成する</span>
+                    </a>
+                  </div>
+
+                  <!-- Step 3: ポストURL入力＆検証 -->
+                  <div class="space-y-1.5">
+                    <label class="text-xs font-extrabold text-gray-700 block">ポストのURLを貼り付け</label>
+                    <input type="url"
+                           v-model="postUrlInput"
+                           placeholder="https://x.com/your_id/status/123456789..."
+                           class="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+
+                  <button @click="verifyOwnerByPostUrl"
+                          :disabled="!isOnline || isProcessing || !postUrlInput.trim() || !selectedCircleId"
+                          type="button"
+                          class="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs md:text-sm font-extrabold shadow-sm cursor-pointer transition">
+                    {{ isProcessing ? '公開ポストを確認中...' : 'ポストURLで本人確認を実行' }}
+                  </button>
                 </div>
               </div>
 
@@ -295,6 +346,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'open-standard-auth', 'memberships-updated']);
 
 const mode = ref('owner');
+const ownerAuthMethod = ref('dm');
 const verifyCode = ref(generatePostVerifyCode());
 const circleSearch = ref('');
 const selectedCircleId = ref('');
@@ -318,6 +370,16 @@ const refreshVerifyCode = () => {
 const xPostIntentUrl = computed(() => {
   const text = `${EVENT_CONFIG.name} サークル認証用確認コード: ${verifyCode.value}\n${EVENT_CONFIG.hashtag}`;
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+});
+
+const adminXProfileUrl = computed(() => {
+  const raw = String(EVENT_CONFIG.adminContactX || '').replace(/^@/, '').trim();
+  return raw ? `https://x.com/${raw}` : '';
+});
+
+const dmTemplateText = computed(() => {
+  const label = selectedCircleId.value ? getCircleLabel(selectedCircleId.value) : '';
+  return `${EVENT_CONFIG.name} サークル認証申請\n受付番号: ${submittedRequestCode.value}\nサークル: ${label}`;
 });
 
 const filteredCircles = computed(() => {
