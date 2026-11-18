@@ -246,7 +246,22 @@
                  @touchstart.passive="handleMapPointerDown"
                  @click="handleMapClick"
                  @touchmove="dragPin" @mousemove="dragPin" @mouseup="stopDrag" @mouseleave="stopDrag" @touchend="stopDrag">
-              <img v-if="!isMapImageError"
+              <div v-if="!isTestMode && circles.length === 0 && !loading"
+                   class="flex flex-col items-center justify-center p-8 text-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl m-6 space-y-3 max-w-md mx-auto">
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-2xl">🗺️</div>
+                <div class="space-y-1">
+                  <p class="text-sm font-extrabold text-slate-800">会場配置図は公式発表後に公開されます</p>
+                  <p class="text-xs text-slate-600 leading-relaxed">
+                    {{ EVENT_CONFIG.name }}（{{ EVENT_CONFIG.venue }}）の正式配置図が公開され次第、マップと巡回ルート機能を有効化します。
+                  </p>
+                </div>
+                <a v-if="ENABLE_TEST_MODE"
+                   href="?mode=test"
+                   class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold transition">
+                  🧪 テストモードでマップ・ルートを試す
+                </a>
+              </div>
+              <img v-else-if="!isMapImageError"
                    src="/map.jpg"
                    alt="会場マップ"
                    class="map-image"
@@ -615,7 +630,22 @@
                        @touchstart.passive="handleMapPointerDown"
                        @click="handleMapClick"
                        @touchmove="dragPin" @mousemove="dragPin" @mouseup="stopDrag" @mouseleave="stopDrag" @touchend="stopDrag">
-                    <img v-if="!isMapImageError"
+                    <div v-if="!isTestMode && circles.length === 0 && !loading"
+                         class="flex flex-col items-center justify-center p-7 text-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl m-4 space-y-3">
+                      <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-2xl">🗺️</div>
+                      <div class="space-y-1">
+                        <p class="text-sm font-extrabold text-slate-800">会場配置図は公式発表後に公開されます</p>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                          {{ EVENT_CONFIG.name }} の正式配置図が公開され次第、マップ・巡回ルート機能を有効化します。
+                        </p>
+                      </div>
+                      <a v-if="ENABLE_TEST_MODE"
+                         href="?mode=test"
+                         class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold transition">
+                        🧪 テストモードでマップを試す
+                      </a>
+                    </div>
+                    <img v-else-if="!isMapImageError"
                     src="/map.jpg"
                     alt="会場マップ"
                     class="map-image"
@@ -1009,8 +1039,33 @@
               </div>
             </teleport>
             
+            <!-- 配置発表待ちの空状態（通常モードで circles=0 件時） -->
+            <div v-if="!isTestMode && circles.length === 0 && !loading" class="p-6 md:p-10 text-center my-4 max-w-lg mx-auto">
+              <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <div class="w-14 h-14 bg-blue-50 border border-blue-200 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-2xl">📣</div>
+                <div class="space-y-1.5">
+                  <p class="font-extrabold text-gray-800 text-sm md:text-base">サークル配置の発表までお待ちください</p>
+                  <p class="text-xs text-gray-600 leading-relaxed">
+                    {{ EVENT_CONFIG.name }}（{{ EVENT_CONFIG.dateLabel }}・{{ EVENT_CONFIG.venue }}）の参加サークル一覧・スペース配置は、公式発表後にこちらへ掲載します。
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <button type="button"
+                          @click="activeTab = 'prep'"
+                          class="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition cursor-pointer">
+                    🛠️ サークル準備を見る
+                  </button>
+                  <a v-if="ENABLE_TEST_MODE"
+                     href="?mode=test"
+                     class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold rounded-xl transition">
+                    🧪 テストモードで機能を試す
+                  </a>
+                </div>
+              </div>
+            </div>
+
             <!-- 検索結果 0件時のエンプティステート -->
-            <div v-if="filteredCircles.length === 0" class="p-10 text-center my-6">
+            <div v-else-if="filteredCircles.length === 0" class="p-10 text-center my-6">
               <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔍</div>
               <p class="font-bold text-gray-700 text-sm mb-1">条件に一致するサークルが見つかりませんでした</p>
               <p class="text-xs text-gray-500 mb-4">検索ワードや絞り込み条件を変更してみてください</p>
@@ -1886,7 +1941,7 @@ import TestModeToolsPanel from './components/TestModeToolsPanel.vue';
 import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
 import { getCircleItemKey, getCircleItemDisplayName, resolveSavedItemKey, calculateSelectedItemsTotal } from './utils/itemKey';
-import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventData } from './utils/testMode';
+import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventData } from './utils/testMode';
 
         const isTestMode = isTestModeActive();
         const ACTIVE_STORAGE_KEY = isTestMode ? getTestStorageKey('saved_list') : STORAGE_KEY;
@@ -3093,7 +3148,8 @@ import { isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventDat
           }
 
           // 2. Supabaseからの追加情報 (お品書き・タグ・欠席情報) を2.5秒タイムアウト保護付きで非同期取得
-          if (isOnline.value) {
+          // （空シェル期間中はサークル情報が0件のためスキップ）
+          if (isOnline.value && circles.value.length > 0) {
             try {
               const fetchPromise = supabaseClient.from('circle_info').select('*');
               const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ error: 'TIMEOUT', data: null }), 2500));

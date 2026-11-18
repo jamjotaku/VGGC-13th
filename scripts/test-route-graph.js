@@ -14,7 +14,10 @@ const rootDir = path.resolve(__dirname, '..');
 
 const routeData = JSON.parse(fs.readFileSync(path.join(rootDir, 'src/map_routes.json'), 'utf8'));
 const mapCoords = JSON.parse(fs.readFileSync(path.join(rootDir, 'src/map_coords.json'), 'utf8'));
-const appData = JSON.parse(fs.readFileSync(path.join(rootDir, 'public/data.json'), 'utf8'));
+const publicData = JSON.parse(fs.readFileSync(path.join(rootDir, 'public/data.json'), 'utf8'));
+const appData = (Array.isArray(publicData.circles) && publicData.circles.length > 0)
+  ? publicData
+  : JSON.parse(fs.readFileSync(path.join(rootDir, 'archive/vggc12th_circles_archive.json'), 'utf8'));
 
 console.log('=== VGGC 12th 巡回ルートグラフ＆経路探索 自動検証 ===');
 

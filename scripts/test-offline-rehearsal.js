@@ -83,13 +83,17 @@ for (const item of requiredCriticalAssets) {
 // ----------------------------------------------------------------------
 console.log('\n💾 【Test 2】オフラインキャッシュ容量 & LocalStorage / Quota 安全性シミュレーション');
 
-// data.json の読み込み
+// data.json の読み込み（空シェル期間中は archive/vggc12th_circles_archive.json をストレステスト入力に使用）
 const dataJsonPath = path.resolve('public/data.json');
-const rawData = fs.readFileSync(dataJsonPath, 'utf8');
+const rawPublicData = fs.readFileSync(dataJsonPath, 'utf8');
+const publicDataJson = JSON.parse(rawPublicData);
+const isShellState = !Array.isArray(publicDataJson.circles) || publicDataJson.circles.length === 0;
+const archivePath = path.resolve('archive/vggc12th_circles_archive.json');
+const rawData = isShellState ? fs.readFileSync(archivePath, 'utf8') : rawPublicData;
 const dataJson = JSON.parse(rawData);
 const circles = dataJson.circles || [];
 
-assert(circles.length >= 350, `サークルデータが全件存在すること (検出: ${circles.length}サークル)`);
+assert(circles.length >= 350, `サークルデータが全件存在すること (検出: ${circles.length}サークル${isShellState ? ' / archive参照' : ''})`);
 
 // キャッシュオブジェクトのサイズ計測
 const dataCacheSize = Buffer.byteLength(rawData, 'utf8');
