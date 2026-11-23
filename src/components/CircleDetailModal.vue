@@ -37,7 +37,7 @@
                       :class="isAbsent ? 'bg-gray-200 text-gray-500 border-gray-300 line-through' : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'">
                 <span>📍 {{ circle.space_sym }}-{{ circle.space_num }}</span>
               </button>
-              <button v-if="!isReadOnly"
+              <button v-if="!isReadOnly && (!isPreviewMode || isOnline)"
                       @click="$emit('addTimeline', circle); $emit('close')"
                       title="当日の個人タイムスケジュール（ポスターじゃんけん・サイン会等）に登録"
                       class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition shadow-2xs active:scale-95 cursor-pointer">
