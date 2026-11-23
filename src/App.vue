@@ -1852,31 +1852,17 @@
       @test-timeline-notify="triggerTimelineTest"
     />
 
-    <!-- テストモード限定：一般側見え方プレビュー 切替バナー -->
-    <div v-if="isTestMode && selectedCircle && previewOfflineOverride !== null"
-         class="fixed top-3 left-1/2 -translate-x-1/2 z-[70] bg-slate-900/95 text-white px-3.5 py-2 rounded-full shadow-xl border border-indigo-400/50 flex items-center gap-2 text-xs">
-      <span class="font-extrabold text-indigo-300">👁️ 見え方プレビュー:</span>
-      <button @click="previewOfflineOverride = false"
-              class="px-2.5 py-0.5 rounded-full font-extrabold cursor-pointer transition"
-              :class="!previewOfflineOverride ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        🌐 オンライン
-      </button>
-      <button @click="previewOfflineOverride = true"
-              class="px-2.5 py-0.5 rounded-full font-extrabold cursor-pointer transition"
-              :class="previewOfflineOverride ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        📡 圏外
-      </button>
-    </div>
-
     <!-- ★サークル詳細 / お品書き モーダル (PC2カラム ＆ スマホタブ切り替え対応) -->
     <CircleDetailModal 
       :circle="selectedCircle" 
       :circle-extra-info="circleExtraInfo" 
       :saved-list="savedList" 
-      :is-read-only="isReadOnly || (isTestMode && previewOfflineOverride !== null)" 
+      :is-read-only="isReadOnly" 
       :related-circles="relatedCircles" 
       :is-tweet-loading="isTweetLoading" 
       :is-online="previewOfflineOverride !== null ? !previewOfflineOverride : isOnline"
+      :is-preview-mode="isTestMode && previewOfflineOverride !== null"
+      @set-preview-offline="previewOfflineOverride = $event"
       @close="closeDetails" 
       @toggle-save="toggleSave" 
       @toggle-bought="toggleBought"

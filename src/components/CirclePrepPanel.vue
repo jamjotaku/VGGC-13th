@@ -290,7 +290,7 @@
                 <span class="text-xs text-slate-500">円 ×</span>
               </div>
               <div class="flex items-center gap-1">
-                <input v-model.number="row.qty" @input="savePlannerState" type="number" min="0" step="5"
+                <input v-model.number="row.qty" @input="savePlannerState" type="number" min="0" step="1"
                        class="w-16 h-8 px-2 text-xs font-mono text-right border border-slate-300 rounded-lg" />
                 <span class="text-xs text-slate-500">部</span>
               </div>

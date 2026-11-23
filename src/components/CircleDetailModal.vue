@@ -3,6 +3,29 @@
     <div v-if="circle" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 md:p-6" @click.self="$emit('close')">
       <div class="bg-white rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-2xl md:max-w-4xl lg:max-w-5xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
         
+        <!-- テストモード限定：一般側見え方プレビュー 切替バー（モーダル内部最上部に配置） -->
+        <div v-if="isPreviewMode"
+             class="px-3.5 py-2 bg-slate-900 text-white border-b border-indigo-400/40 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-extrabold text-indigo-300">👁️ 見え方プレビュー:</span>
+            <button type="button"
+                    @click="$emit('setPreviewOffline', false)"
+                    class="px-2.5 py-1 rounded-full font-extrabold cursor-pointer transition"
+                    :class="isOnline ? 'bg-sky-500 text-white shadow-xs' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+              🌐 オンライン
+            </button>
+            <button type="button"
+                    @click="$emit('setPreviewOffline', true)"
+                    class="px-2.5 py-1 rounded-full font-extrabold cursor-pointer transition"
+                    :class="!isOnline ? 'bg-amber-500 text-slate-950 shadow-xs' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+              📡 圏外
+            </button>
+          </div>
+          <span class="text-[11px] text-slate-300">
+            {{ isOnline ? 'オンライン表示中' : '圏外（オフライン）表示中' }}
+          </span>
+        </div>
+
         <!-- ヘッダー -->
         <div class="p-3.5 md:p-5 border-b bg-white flex justify-between items-start relative z-10 shadow-sm"
              :class="isAbsent ? 'bg-red-50/40' : 'bg-white'">
@@ -591,10 +614,14 @@ const props = defineProps({
   isOnline: {
     type: Boolean,
     default: true
+  },
+  isPreviewMode: {
+    type: Boolean,
+    default: false
   }
 });
 
-defineEmits(['close', 'toggleSave', 'toggleBought', 'toggleSoldout', 'toggleItem', 'changeItemQuantity', 'openCircle', 'jumpToMap', 'addTimeline']);
+defineEmits(['close', 'toggleSave', 'toggleBought', 'toggleSoldout', 'toggleItem', 'changeItemQuantity', 'openCircle', 'jumpToMap', 'addTimeline', 'setPreviewOffline']);
 
 const mobileModalTab = ref('items');
 const activeOshinagakiIndex = ref(0);
@@ -652,6 +679,11 @@ const staffAccounts = computed(() => {
 let imgLoadTimeout = null;
 
 // タブ切替時に画像読み込み状態をリセット
+watch(() => props.isOnline, () => {
+  pixivImgError.value = false;
+  pixivImgLoaded.value = false;
+});
+
 watch(activeOshinagakiIndex, () => {
   if (imgLoadTimeout) clearTimeout(imgLoadTimeout);
   pixivImgLoaded.value = false;
