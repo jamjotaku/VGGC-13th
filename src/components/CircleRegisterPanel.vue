@@ -82,6 +82,20 @@
           </button>
         </div>
 
+        <!-- お釣り早見表トグルボタン（テストモード先行） -->
+        <button
+          v-if="isTestMode"
+          @click="showChangeTable = !showChangeTable"
+          class="px-2.5 py-1.5 rounded-xl border text-xs font-extrabold transition flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
+          :class="showChangeTable
+            ? 'bg-amber-500 text-slate-950 border-amber-400'
+            : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'"
+          title="1,000円/5,000円/10,000円札のお釣り早見表を開閉します"
+        >
+          <span>💴</span>
+          <span class="hidden sm:inline">お釣り早見表</span>
+        </button>
+
         <!-- ブラウザ全画面 (Fullscreen API) トグルボタン -->
         <button
           @click="toggleBrowserFullscreen"
@@ -94,6 +108,11 @@
           <span>{{ isBrowserFullscreen ? '🗗 全画面解除' : '⛶ 全画面' }}</span>
         </button>
       </div>
+    </div>
+
+    <!-- お釣り早見表（テストモード先行・軽量折りたたみ小窓） -->
+    <div v-if="isTestMode && showChangeTable" class="px-3 md:px-5 py-2.5 bg-amber-50/95 border-b border-amber-200 max-h-72 overflow-y-auto shrink-0">
+      <ChangeTableWidget :products="allProducts" />
     </div>
 
     <!-- =========================================================
@@ -1168,6 +1187,7 @@ import {
   buildRegisterSettlementCsv
 } from '../utils/registerV2';
 import { EVENT_CONFIG } from '../eventConfig';
+import ChangeTableWidget from './ChangeTableWidget.vue';
 
 const props = defineProps({
   circle: {
@@ -1189,6 +1209,10 @@ const props = defineProps({
   circleId: {
     type: String,
     default: EVENT_CONFIG.register.defaultCircleId
+  },
+  isTestMode: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -1197,6 +1221,7 @@ const emit = defineEmits(['exit-register']);
 const LOW_STOCK_THRESHOLD = 5;
 
 const subTab = ref('pos');
+const showChangeTable = ref(false);
 const posSellerFilter = ref('ALL');
 const showQuickAddModal = ref(false);
 const isSyncing = ref(false);

@@ -1,6 +1,6 @@
 // src/utils/testMode.js
 // VGGC 13th テストモード（?mode=test）用の疎結合モジュール
-// ふわのん「ダミーデータ材料プールとエッジケース仕様 v1 (2026-11-17)」準拠
+// ふわのん「ダミーデータ材料プールとエッジケース仕様 v2 (2026-11-18)」準拠
 // 本番データ公開時は ENABLE_TEST_MODE を false にするか本モジュールの利用箇所を外すだけで無効化できます。
 
 export const ENABLE_TEST_MODE = true;
@@ -115,7 +115,6 @@ const RESERVED_FIXED_NAMES = new Set([
   '星屑完売堂',
   '深夜喫茶',
   '月夜残りわずか工房',
-  '極彩大所帯12品ラボ',
   '硝子画像リンク欠落軒',
   'しろつめくさ無配屋',
   '紙飛行機合同印刷部',
@@ -130,7 +129,7 @@ const PENNAME_POOL = [
   ['みぞれ', 'ミゾレ'], ['ゆきみ', 'ユキミ'], ['らて', 'ラテ'], ['もか', 'モカ'],
   ['すずね', 'スズネ'], ['ことり', 'コトリ'], ['ひなた', 'ヒナタ'], ['しぐれ', 'シグレ'],
   ['あまね', 'アマネ'], ['ほたる', 'ホタル'], ['るり', 'ルリ'], ['かえで', 'カエデ'],
-  ['さくら', 'サクラ'], ['ぽてと', 'ポテトラ'], ['まろん', 'マロン'], ['てとら', 'テトラ']
+  ['さくら', 'サクラ'], ['ぽてと', 'ポテト'], ['まろん', 'マロン'], ['てとら', 'テトラ']
 ];
 
 // ==========================================
@@ -187,7 +186,7 @@ function buildLongComment(circleName) {
 
 /**
  * 既存マップ座標 (map_coords.json) とメンバーマスタ (vspoDict) から
- * 仕様 v1 準拠でシード固定ダミーサークルデータ＆追加情報を自動生成する
+ * 仕様 v2 準拠でシード固定ダミーサークルデータ＆追加情報を自動生成する
  */
 export function generateMockEventData({
   mapCoords = {},
@@ -294,8 +293,8 @@ export function generateMockEventData({
       tags.push('残りわずか');
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[1]);
     } else if (idx === 2) {
-      circleName = '【目玉03】極彩大所帯12品ラボ';
-      circleKana = 'ゴクサイオオジョタイラボ';
+      circleName = '【目玉03】深夜喫茶';
+      circleKana = 'シンヤキッサ';
       items = Array.from({ length: 12 }, (_, k) => ({
         name: `${mainMember} ${THEME_WORDS[k % THEME_WORDS.length]} ${GOODS_TYPES[k % GOODS_TYPES.length]}`,
         price: GOODS_PRICES[k % GOODS_PRICES.length],
@@ -353,7 +352,7 @@ export function generateMockEventData({
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[5]);
     } else {
       // ---------------------------------------------------------
-      // ランダム生成枠（仕様 v1 の配分・エッジケース準拠）
+      // ランダム生成枠（仕様 v2 の配分・エッジケース準拠）
       // ---------------------------------------------------------
       const isEnCircle = rng() < 0.03;
       const isZeroOnly = !isEnCircle && rng() < 0.02;
