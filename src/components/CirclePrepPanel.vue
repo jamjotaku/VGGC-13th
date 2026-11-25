@@ -453,11 +453,11 @@
         </div>
       </section>
 
-      <!-- ④ お釣り早見表（テストモード用プレビュー：本体はレジ画面内） -->
-      <section v-if="isTestMode" class="space-y-2">
+      <!-- ④ お釣り早見表（通常モード・テストモードともにデフォルト折りたたみで開放） -->
+      <section v-if="showPrepTools" class="space-y-2">
         <div class="flex items-center justify-between px-1">
           <div class="text-xs font-extrabold text-slate-700">
-            💴 ④ お釣り早見表（本体はレジ画面に搭載／未ログインテスト用プレビュー）
+            {{ isTestMode ? '💴 ④ お釣り早見表（本体はレジ画面に搭載／未ログインテスト用プレビュー）' : '💴 ④ お釣り早見表（レジ横早見表・ログイン不要で確認可）' }}
           </div>
           <button @click="showInlineChangeTable = !showInlineChangeTable"
                   class="text-xs font-extrabold text-amber-700 hover:text-amber-900 cursor-pointer">

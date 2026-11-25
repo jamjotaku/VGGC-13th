@@ -19,9 +19,14 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
       <!-- A. VO- / VC- 直接発行 -->
       <div class="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
-        <div class="text-xs font-black text-indigo-950 flex items-center gap-1.5">
-          <span>🎟️</span>
-          <span>結合コード（VO- / VC-）直接発行</span>
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+            <span>🎟️</span>
+            <span>結合コード（VO- / VC-）直接発行</span>
+          </div>
+          <span class="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+            {{ EVENT_CONFIG.circleAuth?.inviteExpireLabel || 'イベント終了翌日まで有効' }}
+          </span>
         </div>
         <div class="flex flex-wrap gap-1.5">
           <input v-model="issueCircleInput" type="text" list="admin-circle-options"
@@ -38,8 +43,9 @@
             発行
           </button>
         </div>
-        <div v-if="lastIssuedCode" class="text-[11px] font-mono font-black text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
-          発行済: {{ lastIssuedCode }}
+        <div v-if="lastIssuedCode" class="text-[11px] font-mono font-black text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center justify-between gap-2 flex-wrap">
+          <span>発行済: {{ lastIssuedCode }}</span>
+          <span class="text-[10px] font-sans font-bold text-indigo-700">期限: {{ EVENT_CONFIG.circleAuth?.inviteExpireLabel || 'イベント終了翌日まで有効' }}</span>
         </div>
       </div>
 
@@ -149,6 +155,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import { EVENT_CONFIG } from '../../eventConfig';
 
 const props = defineProps({
   requests: { type: Array, default: () => [] },

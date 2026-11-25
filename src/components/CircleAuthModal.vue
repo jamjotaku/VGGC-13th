@@ -104,10 +104,15 @@
 
                   <div v-if="generatedCode && generatedCodeCircleId === m.circle_id"
                        class="p-2.5 bg-white border border-amber-300 rounded-xl flex items-center justify-between gap-2">
-                    <span class="font-mono font-black text-sm text-gray-900 tracking-wider">{{ generatedCode }}</span>
+                    <div class="min-w-0">
+                      <div class="font-mono font-black text-sm text-gray-900 tracking-wider">{{ generatedCode }}</div>
+                      <div class="text-[10px] font-bold text-amber-800 mt-0.5">
+                        期限: {{ EVENT_CONFIG.circleAuth?.inviteExpireLabel || 'イベント終了翌日まで有効' }}
+                      </div>
+                    </div>
                     <button @click="copyText(generatedCode, 'code')"
                             type="button"
-                            class="px-2.5 py-1 rounded-lg bg-gray-900 text-white text-[11px] font-bold cursor-pointer">
+                            class="px-2.5 py-1 rounded-lg bg-gray-900 text-white text-[11px] font-bold shrink-0 cursor-pointer">
                       {{ copiedKey === 'code' ? '✓ コピー済' : 'コピー' }}
                     </button>
                   </div>
@@ -351,6 +356,9 @@
                     参加する
                   </button>
                 </div>
+                <p class="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
+                  ※ 招待コード（VC-/VO-）は <span class="font-bold">{{ EVENT_CONFIG.circleAuth?.inviteExpireLabel || 'イベント終了翌日まで有効' }}</span> です。
+                </p>
               </div>
             </div>
           </template>
