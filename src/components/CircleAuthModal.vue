@@ -31,16 +31,17 @@
             ✅ {{ successMsg }}
           </div>
 
-          <!-- 1. 未ログイン時 -->
+          <!-- 1. 未ログイン時（Step 1: アプリ登録＝人の鍵 → 登録後自動で Step 2: 紐づけへ復帰） -->
           <div v-if="!user" class="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div class="text-[11px] font-extrabold text-blue-700">STEP 1 / 2：アプリ登録・ログイン（人の鍵）</div>
             <p class="text-xs text-slate-700 leading-relaxed font-medium">
-              サークル認証や売り子参加を行うには、まず通常のアカウント（ユーザーID＋パスワード）でログインしてください。<br>
-              X アカウントとのアプリ連携（OAuth）は不要です。
+              サークルの名義紐づけや売り子参加を行うには、まずアプリのアカウントを作成・ログインしてください。<br>
+              登録・ログイン完了後は自動的にこの画面へ戻り、そのまま紐づけ（STEP 2）へ進めます（X OAuth不要）。
             </p>
             <button @click="$emit('open-standard-auth')"
                     type="button"
                     class="w-full min-h-[44px] px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-xs">
-              ユーザーIDでログイン / 新規登録
+              登録 / ログインして紐づけへ進む
             </button>
           </div>
 
@@ -87,10 +88,12 @@
                   </button>
                 </div>
 
-                <!-- 売り子用招待コード ワンタップ発行（サークル主のみ） -->
+                <!-- 売り子用招待コード ワンタップ発行＆参加メンバー管理（サークル主のみ） -->
                 <div v-if="m.role === 'owner'" class="pt-2 border-t border-amber-200/70 space-y-2">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-bold text-amber-900">🎟️ 売り子用招待コード（7日間・最大5名）</span>
+                    <span class="text-[11px] font-bold text-amber-900">
+                      🎟️ 売り子招待コード（{{ EVENT_CONFIG.circleAuth?.inviteExpireLabel || 'イベント終了翌日まで有効' }}・最大5名）
+                    </span>
                     <button @click="generateInviteCode(m.circle_id)"
                             :disabled="!isOnline || isProcessing"
                             type="button"
@@ -108,6 +111,40 @@
                       {{ copiedKey === 'code' ? '✓ コピー済' : 'コピー' }}
                     </button>
                   </div>
+
+                  <!-- 構造変更2-A: 代表による売り子解除パネル -->
+                  <div v-if="EVENT_CONFIG.circleAuth?.enableStaffRevokeByOwner !== false" class="pt-1">
+                    <button @click="toggleCircleMembers(m.circle_id)"
+                            :disabled="!isOnline || loadingMembersCircleId === m.circle_id"
+                            type="button"
+                            class="text-[11px] font-extrabold text-amber-900 hover:underline flex items-center gap-1 cursor-pointer">
+                      <span>👥 参加メンバー管理</span>
+                      <span>{{ expandedMembersCircleId === m.circle_id ? '▲' : '▼' }}</span>
+                    </button>
+
+                    <div v-if="expandedMembersCircleId === m.circle_id" class="mt-2 space-y-1.5 bg-white border border-amber-200 rounded-xl p-2.5">
+                      <div v-if="loadingMembersCircleId === m.circle_id" class="text-[11px] text-gray-500">読み込み中...</div>
+                      <div v-else-if="!(membersByCircle[m.circle_id]?.length)" class="text-[11px] text-gray-500">メンバー情報がありません。</div>
+                      <div v-else v-for="mem in membersByCircle[m.circle_id]" :key="mem.user_id"
+                           class="flex items-center justify-between gap-2 text-[11px] py-1 border-b last:border-b-0 border-gray-100">
+                        <div class="min-w-0">
+                          <span class="px-1.5 py-0.5 rounded font-extrabold mr-1"
+                                :class="mem.role === 'owner' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'">
+                            {{ mem.role === 'owner' ? '代表' : '売り子' }}
+                          </span>
+                          <span class="font-mono font-bold text-gray-800">{{ mem.verified_x_handle ? `@${mem.verified_x_handle}` : mem.account_label }}</span>
+                          <span v-if="mem.is_self" class="text-[10px] text-gray-400 ml-1">(自分)</span>
+                        </div>
+                        <button v-if="mem.role === 'staff' && !mem.is_self"
+                                @click="revokeStaffMember(m.circle_id, mem)"
+                                :disabled="isProcessing"
+                                type="button"
+                                class="px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold shrink-0 cursor-pointer">
+                          解除
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -119,13 +156,13 @@
                         type="button"
                         class="py-2 rounded-lg text-xs font-extrabold transition cursor-pointer"
                         :class="mode === 'owner' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'">
-                  👑 サークル主認証
+                  👑 サークル紐づけ（代表）
                 </button>
                 <button @click="mode = 'staff'"
                         type="button"
                         class="py-2 rounded-lg text-xs font-extrabold transition cursor-pointer"
                         :class="mode === 'staff' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'">
-                  🎟️ 売り子コード参加
+                  🎟️ 招待コード入力（VC-/VO-）
                 </button>
               </div>
 
@@ -246,10 +283,10 @@
                   </div>
                 </div>
 
-                <!-- 方法B：確認コード付きポストURLによる即時自動認証（任意ルート） -->
+                <!-- 方法B：公式リスト掲載Xアカウントの支配証明（確認コード付きポストURL検証） -->
                 <div v-else class="p-3.5 rounded-2xl bg-blue-50/40 border border-blue-200 space-y-2.5">
                   <div class="text-[11px] text-blue-950 leading-relaxed">
-                    <span class="font-extrabold">⚡ 即時自動認証（任意）:</span> 下の確認コードを含めて X でポストし、そのURLを貼ると運営確認なしで即座に認証できます（認証後はポスト削除OK）。
+                    <span class="font-extrabold">⚡ 紐づけ時のXアカウント支配証明:</span> 公式リストに掲載されているサークルのXアカウントで下の一時確認コードをポストし、URLを貼ると即座に紐づけできます（確認後はポスト削除OK／既に別代表が登録済みの場合は競合確認へ回ります）。
                   </div>
 
                   <!-- Step 1: ワンタイム確認コード -->
@@ -482,7 +519,7 @@ const generateInviteCode = async (circleId) => {
 const redeemInviteCode = async () => {
   const normalized = normalizeInviteCode(inviteCodeInput.value);
   if (!normalized) {
-    errorMsg.value = '招待コードの形式が正しくありません（例: VC-XXXX-XXXX）。';
+    errorMsg.value = '招待コードの形式が正しくありません（例: VC-XXXX-XXXX / VO-XXXX-XXXX）。';
     return;
   }
   errorMsg.value = '';
@@ -494,16 +531,67 @@ const redeemInviteCode = async () => {
     });
     if (error) throw error;
     if (!data?.ok) {
+      if (data?.error === 'OWNER_CONFLICT') {
+        throw new Error(`このサークルは既に別の代表アカウントで紐づけ済みのため自動確定を保留しました（受付番号: ${data.request_code}）。運営側で確認・裁定します。`);
+      }
       throw new Error('招待コードが無効、または有効期限切れ・利用上限に達しています。');
     }
     inviteCodeInput.value = '';
     successMsg.value =
       data.role === 'owner'
-        ? 'オーナー招待コードでサークル主として認証されました！'
-        : '売り子としてサークルに参加しました！レジ機能が利用可能です。';
+        ? 'オーナー結合コード（VO-）でサークル主として紐づけされました！'
+        : '売り子招待コード（VC-）でサークルに参加しました！レジ機能が利用可能です。';
     emit('memberships-updated');
   } catch (err) {
     errorMsg.value = err.message || 'コードの適用に失敗しました。';
+  } finally {
+    isProcessing.value = false;
+  }
+};
+
+// 構造変更2-A: 代表による参加メンバー管理・売り子解除
+const expandedMembersCircleId = ref('');
+const loadingMembersCircleId = ref('');
+const membersByCircle = ref({});
+
+const toggleCircleMembers = async (circleId) => {
+  if (expandedMembersCircleId.value === circleId) {
+    expandedMembersCircleId.value = '';
+    return;
+  }
+  expandedMembersCircleId.value = circleId;
+  loadingMembersCircleId.value = circleId;
+  errorMsg.value = '';
+  try {
+    const { data, error } = await supabaseClient.rpc('get_my_circle_members', { p_circle_id: circleId });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || 'メンバー一覧の取得に失敗しました。');
+    membersByCircle.value = { ...membersByCircle.value, [circleId]: data.members || [] };
+  } catch (err) {
+    errorMsg.value = err.message || 'メンバー一覧の取得に失敗しました。';
+  } finally {
+    loadingMembersCircleId.value = '';
+  }
+};
+
+const revokeStaffMember = async (circleId, member) => {
+  errorMsg.value = '';
+  successMsg.value = '';
+  isProcessing.value = true;
+  try {
+    const { data, error } = await supabaseClient.rpc('owner_revoke_staff_membership', {
+      p_circle_id: circleId,
+      p_target_user_id: member.user_id
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || '売り子権限の解除に失敗しました。');
+    successMsg.value = `売り子 (${member.verified_x_handle ? '@' + member.verified_x_handle : member.account_label}) の権限を解除しました。`;
+    membersByCircle.value = {
+      ...membersByCircle.value,
+      [circleId]: (membersByCircle.value[circleId] || []).filter((m) => m.user_id !== member.user_id)
+    };
+  } catch (err) {
+    errorMsg.value = err.message || '売り子権限の解除に失敗しました。';
   } finally {
     isProcessing.value = false;
   }

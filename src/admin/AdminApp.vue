@@ -262,8 +262,11 @@
           <AdminAuthRequestsTab v-show="activeTab === 'auth_requests'"
                                 :requests="authRequests"
                                 :circles="circles"
+                                :last-issued-code="lastIssuedAdminCode"
                                 @refresh="fetchAuthRequests"
-                                @resolve="resolveAuthRequest" />
+                                @resolve="resolveAuthRequest"
+                                @issue-code="issueAdminInviteCode"
+                                @reassign-membership="reassignCircleMembership" />
 
           <!-- タブ5: バックアップ -->
           <AdminBackupTab v-show="activeTab === 'backup'"
@@ -449,6 +452,41 @@ const resolveAuthRequest = async (reqId, action) => {
     await fetchAuthRequests();
   } catch (err) {
     showToast(err.message || '申請処理エラー', 'error');
+  }
+};
+
+const lastIssuedAdminCode = ref('');
+
+const issueAdminInviteCode = async ({ circleId, targetRole }) => {
+  try {
+    const { data, error } = await supabaseClient.rpc('admin_create_circle_invite_code', {
+      p_circle_id: circleId,
+      p_target_role: targetRole,
+      p_max_uses: targetRole === 'staff' ? 5 : 1
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || 'コード発行に失敗しました');
+    lastIssuedAdminCode.value = data.code;
+    try { await navigator.clipboard.writeText(data.code); } catch (e) {}
+    showToast(`コードを発行＆コピーしました: ${data.code}`, 'success');
+  } catch (err) {
+    showToast(err.message || 'コード発行エラー', 'error');
+  }
+};
+
+const reassignCircleMembership = async ({ circleId, targetAccount, role, revokeExistingOwners }) => {
+  try {
+    const { data, error } = await supabaseClient.rpc('admin_reassign_circle_membership', {
+      p_circle_id: circleId,
+      p_target_account: targetAccount,
+      p_role: role,
+      p_revoke_existing_owners: revokeExistingOwners
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || '緊急再紐づけに失敗しました');
+    showToast(`緊急再紐づけを完了しました (${data.target_email} / ${data.role})`, 'success');
+  } catch (err) {
+    showToast(err.message || '緊急再紐づけエラー', 'error');
   }
 };
 

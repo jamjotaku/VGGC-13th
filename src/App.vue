@@ -1773,7 +1773,11 @@
             :is-test-mode="isTestMode"
             :circles="circles"
             :circle-extra-info="circleExtraInfo"
+            :user="user"
+            :circle-memberships="circleMemberships"
+            :is-online="isOnline"
             @preview-circle="openPreviewCircle"
+            @open-circle-auth="showCircleAuthModal = true"
           />
 
         </div>
@@ -1893,7 +1897,7 @@
       :circles="circles"
       :memberships="circleMemberships"
       @close="showCircleAuthModal = false"
-      @open-standard-auth="showCircleAuthModal = false; showAuthModal = true"
+      @open-standard-auth="pendingResumeCircleAuth = true; showCircleAuthModal = false; showAuthModal = true"
       @memberships-updated="loadCircleMemberships(user?.id)"
     />
 
@@ -1941,6 +1945,7 @@ import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, ge
         const REGISTER_CIRCLE_ID = EVENT_CONFIG.register.defaultCircleId;
         const hasRegisterRowInCloud = ref(false);
         const showCircleAuthModal = ref(false);
+        const pendingResumeCircleAuth = ref(false);
         const circleMemberships = ref([]);
 
         const circles = ref([]);
@@ -3847,6 +3852,11 @@ import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, ge
         });
 
         watch(user, async (u) => {
+          if (u && pendingResumeCircleAuth.value) {
+            pendingResumeCircleAuth.value = false;
+            showAuthModal.value = false;
+            showCircleAuthModal.value = true;
+          }
           if (u) {
             await loadCircleMemberships(u.id);
           } else {

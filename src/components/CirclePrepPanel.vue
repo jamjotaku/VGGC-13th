@@ -24,6 +24,54 @@
       </div>
     </div>
 
+    <!-- P3 当日自己点検カード（ログイン・紐づけ・オフラインキャッシュ確認） -->
+    <section class="bg-white rounded-2xl border border-emerald-200 shadow-xs p-3.5 md:p-4 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">🩺</span>
+          <h3 class="font-extrabold text-xs md:text-sm text-slate-900">当日・前日 準備自己点検（P3チェック）</h3>
+        </div>
+        <button @click="$emit('open-circle-auth')"
+                type="button"
+                class="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-extrabold shadow-2xs cursor-pointer transition">
+          🏪 サークル紐づけ / 招待コード
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <div class="rounded-xl border p-2.5 flex items-center gap-2"
+             :class="user ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'">
+          <span class="text-sm shrink-0">{{ user ? '✅' : '⚪' }}</span>
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold opacity-80">1. アプリログイン（人の鍵）</div>
+            <div class="font-extrabold truncate">{{ user ? userDisplayLabel : '未ログイン（紐づけ時に登録可）' }}</div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border p-2.5 flex items-center gap-2"
+             :class="circleMemberships.length > 0 ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'">
+          <span class="text-sm shrink-0">{{ circleMemberships.length > 0 ? '✅' : '⚪' }}</span>
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold opacity-80">2. サークル名義の紐づけ</div>
+            <div class="font-extrabold truncate">
+              {{ circleMemberships.length > 0 ? `${circleMemberships.length}件 紐づけ済` : '未紐づけ（配置発表後／VC-）' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border p-2.5 flex items-center gap-2"
+             :class="hasLocalOfflineReady ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'">
+          <span class="text-sm shrink-0">{{ hasLocalOfflineReady ? '✅' : '⚠️' }}</span>
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold opacity-80">3. オフライン端末準備</div>
+            <div class="font-extrabold truncate">
+              {{ hasLocalOfflineReady ? (isOnline ? '端末保存済（オンライン）' : '圏外稼働OK（端末保存済）') : '初回データ保存待ち' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- サブセクション1: 入稿目安カレンダー -->
     <section class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
       <div class="p-3.5 md:p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2 bg-gray-50/70">
@@ -187,8 +235,8 @@
       </div>
     </section>
 
-    <!-- サブセクション2: 通常モード時は拡張予定スロットのみ表示 -->
-    <section v-if="!isTestMode" class="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-4 text-xs text-slate-600 space-y-1.5">
+    <!-- サブセクション2: 無効化設定時のみ拡張予定スロットを表示 -->
+    <section v-if="!showPrepTools" class="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-4 text-xs text-slate-600 space-y-1.5">
       <div class="font-extrabold text-slate-800 flex items-center gap-1.5">
         <span>🧩</span>
         <span>サークル準備ツール 拡張予定エリア</span>
@@ -199,7 +247,7 @@
     </section>
 
     <!-- =========================================================
-         T-065 先行テスト実装群（?mode=test のみ表示・通常訪問者には非表示）
+         T-065 P0 サークル準備便利機能群（端末内ローカル完結）
     ========================================================== -->
     <template v-else>
 
@@ -210,9 +258,9 @@
             <h3 class="font-extrabold text-sm md:text-base text-indigo-950 flex items-center gap-1.5">
               <span>✅</span>
               <span>① 準備チェックリスト（撤収・宅配搬出メモ内包）</span>
-              <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
+              <span v-if="isTestMode" class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
             </h3>
-            <p class="text-[11px] text-indigo-700 mt-0.5">持ち物・設営・撤収（宅配搬出）を端末内テストストレージに保存します。</p>
+            <p class="text-[11px] text-indigo-700 mt-0.5">持ち物・設営・撤収（宅配搬出）をこの端末内のみに保存します（ログイン不要）。</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs font-mono font-black text-indigo-900 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg">
@@ -269,7 +317,7 @@
             <h3 class="font-extrabold text-sm md:text-base text-amber-950 flex items-center gap-1.5">
               <span>🪙</span>
               <span>② 釣り銭準備プランナー</span>
-              <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
+              <span v-if="isTestMode" class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
             </h3>
             <p class="text-[11px] text-amber-800 mt-0.5">頒布価格と予定部数から、用意しておくべき釣り銭枚数・準備金額を試算します。</p>
           </div>
@@ -329,16 +377,16 @@
         </div>
       </section>
 
-      <!-- ③ ワンタップ告知ポスト＋直リンク（?circle=...） & ⑤ 見え方プレビュー -->
-      <section class="bg-white rounded-2xl border border-sky-200 shadow-xs overflow-hidden">
+      <!-- ③ ワンタップ告知ポスト＋直リンク（?circle=...） & ⑤ 見え方プレビュー（サークルデータ公開後またはテストモード時に有効） -->
+      <section v-if="selectableCircles.length > 0" class="bg-white rounded-2xl border border-sky-200 shadow-xs overflow-hidden">
         <div class="p-3.5 md:p-4 border-b border-sky-100 bg-sky-50/70 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 class="font-extrabold text-sm md:text-base text-sky-950 flex items-center gap-1.5">
               <span>📣</span>
               <span>③ ワンタップ告知ポスト＋直リンク ＆ ⑤ 見え方プレビュー</span>
-              <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
+              <span v-if="isTestMode" class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">TEST先行</span>
             </h3>
-            <p class="text-[11px] text-sky-800 mt-0.5">テスト用サークルを選んで直リンク告知文の生成と、一般側（オンライン／圏外）の見え方を確認できます。</p>
+            <p class="text-[11px] text-sky-800 mt-0.5">サークルを選んで直リンク告知文の生成と、一般側（オンライン／圏外）の見え方を確認できます。</p>
           </div>
         </div>
 
@@ -406,7 +454,7 @@
       </section>
 
       <!-- ④ お釣り早見表（テストモード用プレビュー：本体はレジ画面内） -->
-      <section class="space-y-2">
+      <section v-if="isTestMode" class="space-y-2">
         <div class="flex items-center justify-between px-1">
           <div class="text-xs font-extrabold text-slate-700">
             💴 ④ お釣り早見表（本体はレジ画面に搭載／未ログインテスト用プレビュー）
@@ -448,10 +496,34 @@ import ChangeTableWidget from './ChangeTableWidget.vue';
 const props = defineProps({
   isTestMode: { type: Boolean, default: false },
   circles: { type: Array, default: () => [] },
-  circleExtraInfo: { type: Object, default: () => ({}) }
+  circleExtraInfo: { type: Object, default: () => ({}) },
+  user: { type: Object, default: null },
+  circleMemberships: { type: Array, default: () => [] },
+  isOnline: { type: Boolean, default: true }
 });
 
-const emit = defineEmits(['preview-circle']);
+const emit = defineEmits(['preview-circle', 'open-circle-auth']);
+
+const showPrepTools = computed(() => props.isTestMode || Boolean(EVENT_CONFIG.circleAuth?.enableP0PrepToolsPublic));
+
+const userDisplayLabel = computed(() => {
+  const email = props.user?.email || '';
+  if (!email) return 'ログイン中';
+  return `@${email.split('@')[0]}`;
+});
+
+const hasLocalOfflineReady = computed(() => {
+  try {
+    if (props.isTestMode) return true;
+    return Boolean(
+      localStorage.getItem(EVENT_CONFIG.storageKey('data_cache')) ||
+      localStorage.getItem(EVENT_CONFIG.storageKey('circle_memberships_cache')) ||
+      localStorage.getItem(EVENT_CONFIG.storageKey('prep_checklist_v1'))
+    );
+  } catch {
+    return false;
+  }
+});
 
 const enableTestMode = ENABLE_TEST_MODE;
 const safetyBufferDays = ref(2);
@@ -494,10 +566,14 @@ const countdownBadgeClass = (tone) => {
 };
 
 // =========================================================
-// T-065 テストモード先行機能 ロジック
+// T-065 準備ツール ロジック（通常/テストでストレージ分離）
 // =========================================================
-const CHECKLIST_STORAGE_KEY = getTestStorageKey('prep_checklist_v1');
-const PLANNER_STORAGE_KEY = getTestStorageKey('change_planner_v1');
+const CHECKLIST_STORAGE_KEY = props.isTestMode
+  ? getTestStorageKey('prep_checklist_v1')
+  : EVENT_CONFIG.storageKey('prep_checklist_v1');
+const PLANNER_STORAGE_KEY = props.isTestMode
+  ? getTestStorageKey('change_planner_v1')
+  : EVENT_CONFIG.storageKey('change_planner_v1');
 
 const loadInitialChecklist = () => {
   try {

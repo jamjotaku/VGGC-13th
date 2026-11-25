@@ -149,6 +149,46 @@ export default async function handler(req, res) {
         });
       }
 
+      // 2.5 構造変更1: 既存の別アクティブ owner がいる場合は先取り競合として自動保留（claim_conflict 起票）
+      const conflictRes = await fetch(
+        `${supabaseUrl}/rest/v1/circle_memberships?circle_id=eq.${encodeURIComponent(circleId)}&role=eq.owner&revoked_at=is.null&select=user_id`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`
+          }
+        }
+      );
+      const existingOwners = conflictRes.ok ? await conflictRes.json() : [];
+      const hasOtherOwner = existingOwners.some((row) => row.user_id !== authUser.id);
+      if (hasOtherOwner) {
+        const reqCode = `REQ-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        await fetch(`${supabaseUrl}/rest/v1/circle_auth_requests`, {
+          method: 'POST',
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            request_code: reqCode,
+            user_id: authUser.id,
+            circle_id: circleId,
+            x_handle: check.authorHandle,
+            note: `既存オーナーとの競合（ポストURL検証経由: ${normalizedUrl}）`,
+            status: 'pending',
+            request_kind: 'claim_conflict'
+          })
+        });
+        return res.status(409).json({
+          ok: false,
+          error: 'OWNER_CONFLICT',
+          requestCode: reqCode,
+          authorHandle: check.authorHandle,
+          message: `このサークルは既に別の代表アカウントで紐づけ済みのため自動確定を保留しました（受付番号: ${reqCode}）。運営側で確認・裁定します。`
+        });
+      }
+
       // 3. circle_memberships へ owner / post_url として記録
       const nowIso = new Date().toISOString();
       const upsertRes = await fetch(`${supabaseUrl}/rest/v1/circle_memberships?on_conflict=user_id,circle_id`, {

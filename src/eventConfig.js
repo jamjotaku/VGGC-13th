@@ -109,6 +109,15 @@ export const EVENT_CONFIG = {
     unlockedEmailPrefixes: []
   },
 
+  // サークル認証・フェーズ設計設定（T-074 Step A: 後から切替容易な集約定義）
+  circleAuth: {
+    inviteExpiresAtIso: '2027-03-08T00:00:00+09:00',
+    inviteExpireLabel: 'イベント終了翌日（2027-03-07末）まで有効',
+    enableP0PrepToolsPublic: true,
+    enableStaffRevokeByOwner: true,
+    enableConflictClaimBlock: true
+  },
+
   // デフォルト初期アナウンス (Supabase未接続時やオフライン時の安全フォールバック)
   defaultNotifications: [
     {

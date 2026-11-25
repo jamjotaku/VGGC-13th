@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.circle_invite_codes (
   created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   max_uses integer NOT NULL DEFAULT 5 CHECK (max_uses > 0 AND max_uses <= 20),
   used_count integer NOT NULL DEFAULT 0,
-  expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
+  expires_at timestamptz NOT NULL DEFAULT greatest(now() + interval '7 days', timestamptz '2027-03-08 00:00:00+09'),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -164,6 +164,29 @@ BEGIN
     );
   END IF;
 
+  -- 構造変更1: 既存の別アクティブ owner がいる場合は先取り競合として保留起票
+  IF EXISTS (
+    SELECT 1 FROM public.circle_memberships
+    WHERE circle_id = p_circle_id
+      AND role = 'owner'
+      AND revoked_at IS NULL
+      AND user_id <> v_uid
+  ) THEN
+    DECLARE
+      v_conflict_code text := 'REQ-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 4));
+    BEGIN
+      INSERT INTO public.circle_auth_requests (request_code, user_id, circle_id, x_handle, note, status, request_kind)
+      VALUES (v_conflict_code, v_uid, p_circle_id, v_x_handle, '既存オーナーとの競合（X本人確認経由）', 'pending', 'claim_conflict');
+
+      RETURN jsonb_build_object(
+        'ok', false,
+        'error', 'OWNER_CONFLICT',
+        'request_code', v_conflict_code,
+        'verified_x_handle', v_x_handle
+      );
+    END;
+  END IF;
+
   INSERT INTO public.circle_memberships (
     user_id, circle_id, role, auth_method, verified_x_handle, verified_at, revoked_at, updated_at
   )
@@ -204,7 +227,7 @@ DECLARE
   v_is_owner boolean := false;
   v_raw text := upper(replace(gen_random_uuid()::text, '-', ''));
   v_code text;
-  v_expires_at timestamptz := now() + interval '7 days';
+  v_expires_at timestamptz := greatest(now() + interval '7 days', timestamptz '2027-03-08 00:00:00+09');
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'AUTHENTICATION_REQUIRED';
@@ -273,6 +296,30 @@ BEGIN
 
   v_role := coalesce(v_invite.target_role, CASE WHEN v_normalized_code LIKE 'VO-%' THEN 'owner' ELSE 'staff' END);
   v_method := CASE WHEN v_role = 'owner' THEN 'owner_invite_code' ELSE 'staff_invite_code' END;
+
+  -- 構造変更1: owner コード使用時に既存の別アクティブ owner がいる場合は競合保留
+  IF v_role = 'owner' AND EXISTS (
+    SELECT 1 FROM public.circle_memberships
+    WHERE circle_id = v_invite.circle_id
+      AND role = 'owner'
+      AND revoked_at IS NULL
+      AND user_id <> v_uid
+  ) THEN
+    DECLARE
+      v_conflict_code text := 'REQ-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 4));
+      v_user_handle text := public.normalize_x_handle(split_part(coalesce(auth.jwt() ->> 'email', ''), '@', 1));
+    BEGIN
+      INSERT INTO public.circle_auth_requests (request_code, user_id, circle_id, x_handle, note, status, request_kind)
+      VALUES (v_conflict_code, v_uid, v_invite.circle_id, coalesce(nullif(v_user_handle, ''), 'vo_user'), '既存オーナーとの競合（VOコード: ' || v_normalized_code || '）', 'pending', 'claim_conflict');
+
+      RETURN jsonb_build_object(
+        'ok', false,
+        'error', 'OWNER_CONFLICT',
+        'request_code', v_conflict_code,
+        'circle_id', v_invite.circle_id
+      );
+    END;
+  END IF;
 
   INSERT INTO public.circle_memberships (
     user_id, circle_id, role, auth_method, verified_x_handle, verified_at, revoked_at, updated_at
@@ -355,11 +402,15 @@ CREATE TABLE IF NOT EXISTS public.circle_auth_requests (
   x_handle text NOT NULL,
   note text,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  request_kind text NOT NULL DEFAULT 'dm_manual',
   issued_code text,
   created_at timestamptz NOT NULL DEFAULT now(),
   resolved_at timestamptz,
   resolved_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
+
+ALTER TABLE public.circle_auth_requests
+  ADD COLUMN IF NOT EXISTS request_kind text NOT NULL DEFAULT 'dm_manual';
 
 CREATE INDEX IF NOT EXISTS idx_circle_auth_requests_status_created
   ON public.circle_auth_requests (status, created_at DESC);
@@ -472,5 +523,93 @@ BEGIN
   WHERE id = p_request_id;
 
   RETURN jsonb_build_object('ok', true, 'status', 'approved', 'circle_id', v_req.circle_id);
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 10. 構造変更2-A: 代表（owner）による参加メンバー一覧取得＆売り子解除 RPC
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_my_circle_members(p_circle_id text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_is_owner boolean := false;
+  v_members jsonb;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'AUTHENTICATION_REQUIRED';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.circle_memberships
+    WHERE user_id = v_uid AND circle_id = p_circle_id AND role = 'owner' AND revoked_at IS NULL
+  ) INTO v_is_owner;
+
+  IF NOT v_is_owner THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'OWNER_PERMISSION_REQUIRED');
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'user_id', m.user_id,
+    'role', m.role,
+    'auth_method', m.auth_method,
+    'verified_x_handle', m.verified_x_handle,
+    'verified_at', m.verified_at,
+    'account_label', split_part(coalesce(u.email, ''), '@', 1),
+    'is_self', (m.user_id = v_uid)
+  ) ORDER BY m.role DESC, m.verified_at ASC), '[]'::jsonb)
+  INTO v_members
+  FROM public.circle_memberships m
+  LEFT JOIN auth.users u ON u.id = m.user_id
+  WHERE m.circle_id = p_circle_id
+    AND m.revoked_at IS NULL;
+
+  RETURN jsonb_build_object('ok', true, 'members', v_members);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.owner_revoke_staff_membership(p_circle_id text, p_target_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_is_owner boolean := false;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'AUTHENTICATION_REQUIRED';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.circle_memberships
+    WHERE user_id = v_uid AND circle_id = p_circle_id AND role = 'owner' AND revoked_at IS NULL
+  ) INTO v_is_owner;
+
+  IF NOT v_is_owner THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'OWNER_PERMISSION_REQUIRED');
+  END IF;
+
+  IF p_target_user_id = v_uid THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'CANNOT_REVOKE_SELF_AS_STAFF');
+  END IF;
+
+  UPDATE public.circle_memberships
+  SET revoked_at = now(), updated_at = now()
+  WHERE circle_id = p_circle_id
+    AND user_id = p_target_user_id
+    AND role = 'staff'
+    AND revoked_at IS NULL;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'TARGET_STAFF_NOT_FOUND');
+  END IF;
+
+  RETURN jsonb_build_object('ok', true, 'circle_id', p_circle_id, 'revoked_user_id', p_target_user_id);
 END;
 $$;
