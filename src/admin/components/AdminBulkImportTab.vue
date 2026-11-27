@@ -35,14 +35,27 @@
           ⚠️ {{ parseError }}
         </div>
 
-        <div class="max-h-64 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-          <div v-for="row in matchedRows" :key="row.circle_id" class="p-2.5 text-xs space-y-0.5">
-            <div class="font-extrabold text-slate-900">
-              <span class="font-mono text-blue-700 mr-1">[{{ row.spaceLabel }}]</span>
-              {{ row.circle_name }}
+        <div class="max-h-80 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+          <div v-for="row in matchedRows" :key="row.circle_id" class="p-2.5 text-xs space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-extrabold text-slate-900">
+                <span class="font-mono text-blue-700 mr-1">[{{ row.spaceLabel }}]</span>
+                {{ row.circle_name }}
+              </div>
+              <span v-if="row.items?.length" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">
+                品目 {{ row.items.length }}件
+              </span>
             </div>
             <div class="text-[11px] text-slate-600 truncate">
               X: {{ row.twitterId || '-' }} / URL: {{ row.url || '-' }}
+            </div>
+            <div v-if="row.membersInput || row.tagsInput" class="text-[11px] text-slate-700">
+              <span v-if="row.membersInput" class="mr-2">👤 {{ row.membersInput }}</span>
+              <span v-if="row.tagsInput">🏷️ {{ row.tagsInput }}</span>
+            </div>
+            <div v-if="row.warnings?.length" class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-0.5">
+              <div class="font-extrabold">⚠️ 統制語彙チェック警告 ({{ row.warnings.length }}件):</div>
+              <div v-for="(w, wIdx) in row.warnings" :key="wIdx">・{{ w }}</div>
             </div>
           </div>
           <div v-if="matchedRows.length === 0" class="p-6 text-center text-xs text-slate-400">
@@ -56,6 +69,12 @@
 
 <script setup>
 import { ref } from 'vue';
+import { vspoDict } from '../../constants';
+import {
+  normalizeItemRecord,
+  aggregateCircleTagsFromItems,
+  validateItemsVocabulary
+} from '../../utils/itemTags';
 
 const props = defineProps({
   circles: { type: Array, default: () => [] }
@@ -66,15 +85,24 @@ const emit = defineEmits(['apply-import']);
 const rawInput = ref('');
 const matchedRows = ref([]);
 const parseError = ref('');
+const validCharacterNames = vspoDict.map((m) => m.name);
 
 const loadSample = () => {
   rawInput.value = JSON.stringify([
     {
-      space: 'M-15-16',
-      twitter_id: '@Jamj__Otaku',
-      oshinagaki_url: 'https://x.com/Jamj__Otaku/status/123456',
-      members: ['オールキャラ'],
-      tags: ['新刊', 'グッズセット']
+      space: 'H-31',
+      twitter_id: '@PqsU23',
+      oshinagaki_url: 'https://x.com/PqsU23/status/2117524168648675761',
+      items: [
+        {
+          name: 'BIGアクリルスタンド＆チェキ風箔カードset',
+          price: 2000,
+          note: 'BIGアクリルスタンド（約18cm）とチェキ風箔カードのセット',
+          characters: ['夜乃くろむ'],
+          goods_types: ['アクリルスタンド', 'カード'],
+          attributes: ['セット']
+        }
+      ]
     }
   ], null, 2);
 };
@@ -109,6 +137,19 @@ const parseInput = () => {
         (r.space && `${c.space_sym}-${c.space_num}`.toLowerCase() === String(r.space).trim().toLowerCase())
       );
       if (!target) continue;
+      const normalizedItems = Array.isArray(r.items) ? r.items.map(normalizeItemRecord) : undefined;
+      const aggregated = normalizedItems
+        ? aggregateCircleTagsFromItems(normalizedItems)
+        : { members: [], tags: [] };
+      const warnings = normalizedItems
+        ? validateItemsVocabulary(normalizedItems, validCharacterNames)
+        : [];
+
+      const explicitMembers = Array.isArray(r.members) ? r.members : (r.members ? String(r.members).split(/[,、\n]+/).map(s => s.trim()).filter(Boolean) : []);
+      const explicitTags = Array.isArray(r.tags) ? r.tags : (r.tags ? String(r.tags).split(/[,、\n]+/).map(s => s.trim()).filter(Boolean) : []);
+      const mergedMembers = Array.from(new Set([...aggregated.members, ...explicitMembers]));
+      const mergedTags = Array.from(new Set([...aggregated.tags, ...explicitTags]));
+
       results.push({
         circle_id: target.circle_id,
         circle_name: target.circle_name,
@@ -116,9 +157,10 @@ const parseInput = () => {
         twitterId: r.twitter_id || '',
         staffTwitter: r.staff_twitter || '',
         url: r.oshinagaki_url || r.url || '',
-        membersInput: Array.isArray(r.members) ? r.members.join(', ') : (r.members || ''),
-        tagsInput: Array.isArray(r.tags) ? r.tags.join(', ') : (r.tags || ''),
-        items: Array.isArray(r.items) ? r.items : undefined
+        membersInput: mergedMembers.join(', '),
+        tagsInput: mergedTags.join(', '),
+        items: normalizedItems,
+        warnings
       });
     }
     matchedRows.value = results;

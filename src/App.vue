@@ -1868,6 +1868,7 @@ import TestModeToolsPanel from './components/TestModeToolsPanel.vue';
 import { extractXHandleFromUser } from './utils/circleAuth';
 import { checkUpcomingTimelineReminders, generateTestTimelineNotification } from './utils/timelineNotifier';
 import { getCircleItemKey, getCircleItemDisplayName, resolveSavedItemKey, calculateSelectedItemsTotal } from './utils/itemKey';
+import { matchesCircleQueryAndTags, aggregateCircleTagsFromItems } from './utils/itemTags';
 import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, generateMockEventData } from './utils/testMode';
 
         const isTestMode = isTestModeActive();
@@ -3644,6 +3645,11 @@ import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, ge
               if (!String(t).startsWith('__')) tags.add(t);
             });
             (info.members || []).forEach(m => members.add(m));
+            if (Array.isArray(info.items) && info.items.length > 0) {
+              const agg = aggregateCircleTagsFromItems(info.items);
+              agg.tags.forEach(t => tags.add(t));
+              agg.members.forEach(m => members.add(m));
+            }
           });
           return { tags: Array.from(tags).sort(), members: Array.from(members).sort() };
         });
@@ -3660,37 +3666,20 @@ import { ENABLE_TEST_MODE, isTestModeActive, exitTestMode, getTestStorageKey, ge
         });
 
         const filteredCircles = computed(() => {
-          const q = (searchQuery.value || '').trim().toLowerCase();
           const result = circles.value.filter(circle => {
             const extra = circleExtraInfo.value[circle.circle_id] || {};
-            
-            // ★ 商品名での部分一致
-            const matchItemName = q && (extra.items || []).some(it => 
-              it.name && it.name.toLowerCase().includes(q)
-            );
-
-            // ★ スペース配置（例: "M-31", "M31"）での部分一致
-            const spaceFull = `${circle.space_sym || ''}-${circle.space_num || ''}`.toLowerCase();
-            const spaceCompact = `${circle.space_sym || ''}${circle.space_num || ''}`.toLowerCase();
-            const matchSpace = q && (spaceFull.includes(q) || spaceCompact.includes(q));
-
-            const matchQuery = !q || 
-              (circle.circle_name && circle.circle_name.toLowerCase().includes(q)) ||
-              (circle.penname && circle.penname.toLowerCase().includes(q)) ||
-              (circle.circle_kana && circle.circle_kana.includes(q)) ||
-              matchSpace ||
-              matchItemName;
+            const matchSearchAndTags = matchesCircleQueryAndTags(circle, extra, {
+              query: searchQuery.value,
+              selectedMembers: selectedMembers.value,
+              filterItemTag: filterItemTag.value
+            });
 
             const matchBlock = !filterBlock.value || circle.space_sym === filterBlock.value;
-            const matchMember = selectedMembers.value.length === 0 || 
-              selectedMembers.value.some(m => (extra.members || []).includes(m));
-            const matchItemTag = !filterItemTag.value || (extra.tags || []).includes(filterItemTag.value);
-              
             const matchOshinagaki = !filterHasOshinagaki.value || Boolean(extra.oshinagaki_url) || ((extra.items || []).length > 0);
             const matchRecent = !filterRecentOnly.value || isRecentOshinagakiUpdate(circle.circle_id);
             const matchAbsent = !hideAbsent.value || !isCircleAbsent(circle.circle_id);
-              
-            return matchQuery && matchBlock && matchMember && matchItemTag && matchOshinagaki && matchRecent && matchAbsent;
+
+            return matchSearchAndTags && matchBlock && matchOshinagaki && matchRecent && matchAbsent;
           });
 
           if (searchSortOrder.value === 'recent') {
