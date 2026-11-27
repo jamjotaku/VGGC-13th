@@ -46,11 +46,16 @@
             </div>
           </div>
 
-          <div class="bg-red-50 p-3 rounded-lg border border-red-100">
-            <h3 class="font-bold text-red-600 mb-1 flex items-center gap-1">⚠️ 免責事項（非公式ツールです）</h3>
-            <p class="text-xs text-red-700 leading-relaxed">
+          <div class="bg-red-50 p-3.5 rounded-lg border border-red-200 space-y-2.5">
+            <h3 class="font-bold text-red-600 flex items-center gap-1">⚠️ 免責事項（非公式ツールです）</h3>
+            <p class="text-xs text-red-900 font-bold leading-relaxed bg-white/80 p-2.5 rounded-lg border border-red-200">
+              当サイト及びアカウントはVGGC公式並びにFL準備会とは一切関係のない非公式ファンメイドサイトです<br>
+              公式への問い合わせはご遠慮ください<br>
+              お問い合わせはこちら:<a href="mailto:vggcappinfo@gmail.com" class="underline hover:text-red-700">vggcappinfo@gmail.com</a>
+            </p>
+            <p class="text-[11px] text-red-700 leading-relaxed">
               当アプリは有志が作成した<strong>非公式ツール</strong>です。<br>
-              クリエイターの皆様の権利を尊重し、<strong>サークルカット等の画像データを独自のサーバーに保存・AI学習等へ利用することは一切ありません。</strong> お品書き等は全てX(Twitter)公式の機能を利用して埋め込んで表示しています。<br><br>
+              クリエイターの皆様の権利を尊重し、<strong>サークルカット等の画像データを独自のサーバーに保存・AI学習等へ利用することは一切ありません。</strong> お品書き等は全てX(Twitter)公式の機能を利用して埋め込んで表示しています。<br>
               イベント公式様や、データ元のサイト様へのお問い合わせは固くお断りいたします。
             </p>
           </div>
