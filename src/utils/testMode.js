@@ -132,8 +132,10 @@ const PENNAME_POOL = [
   ['さくら', 'サクラ'], ['ぽてと', 'ポテト'], ['まろん', 'マロン'], ['てとら', 'テトラ']
 ];
 
+import { normalizeItemRecord, aggregateCircleTagsFromItems } from './itemTags.js';
+
 // ==========================================
-// 3. 頒布物・テーマ語・価格プール
+// 3. 頒布物・テーマ語・価格プール（統制語彙タグマッピング付き）
 // ==========================================
 const BOOK_TYPES = [
   '新刊 イラスト本 (B5/24P)',
@@ -148,6 +150,25 @@ const GOODS_TYPES = [
   'アクリルスタンド', 'アクリルキーホルダー', '缶バッジ', '色紙', 'ポスター (B2)',
   'クリアファイル', 'ステッカーセット', 'チェキ風カード', 'タペストリー', 'トートバッグ'
 ];
+
+const ITEM_LABEL_TO_GOODS_TYPE = {
+  '新刊 イラスト本 (B5/24P)': 'イラスト本',
+  '新刊 漫画本': '漫画本',
+  '既刊 イラスト本': 'イラスト本',
+  '新刊 合同誌': '合同誌',
+  '既刊再販 コスプレ写真集': '写真集',
+  '無料配布 ペーパー': 'ペーパー',
+  'アクリルスタンド': 'アクリルスタンド',
+  'アクリルキーホルダー': 'アクリルキーホルダー',
+  '缶バッジ': '缶バッジ',
+  '色紙': '色紙',
+  'ポスター (B2)': 'ポスター',
+  'クリアファイル': 'クリアファイル',
+  'ステッカーセット': 'ステッカー',
+  'チェキ風カード': 'カード',
+  'タペストリー': 'タペストリー',
+  'トートバッグ': 'バッグ'
+};
 
 const THEME_WORDS = [
   'ゆめかわ', 'おでかけ', '制服', 'メイド', '水着',
@@ -278,8 +299,8 @@ export function generateMockEventData({
       circleName = '【目玉01】星屑完売堂';
       circleKana = 'ホシクズカンバイドウ';
       items = [
-        { name: `${mainMember} おでかけ 新刊イラスト本`, price: 1000, note: '完売', soldout: true },
-        { name: `${mainMember} アクリルスタンド`, price: 1500, note: '完売', soldout: true }
+        { name: `${mainMember} おでかけ 新刊イラスト本`, price: 1000, note: '完売', soldout: true, characters: [mainMember], goods_types: ['イラスト本'], attributes: [] },
+        { name: `${mainMember} アクリルスタンド`, price: 1500, note: '完売', soldout: true, characters: [mainMember], goods_types: ['アクリルスタンド'], attributes: [] }
       ];
       tags.push('全品完売', '完売');
       oshinagakiUrl = '/icons/icon.svg';
@@ -287,19 +308,25 @@ export function generateMockEventData({
       circleName = '【目玉02】月夜残りわずか工房';
       circleKana = 'ツキヨノコリワズカコウボウ';
       items = [
-        { name: `${mainMember} 制服 ミニイラスト本`, price: 550, note: '残りわずか（端数550円テスト）' },
-        { name: `${mainMember} 缶バッジ`, price: 500, note: '残り2点' }
+        { name: `${mainMember} 制服 ミニイラスト本`, price: 550, note: '残りわずか（端数550円テスト）', characters: [mainMember], goods_types: ['イラスト本'], attributes: [] },
+        { name: `${mainMember} 缶バッジ`, price: 500, note: '残り2点', characters: [mainMember], goods_types: ['缶バッジ'], attributes: [] }
       ];
       tags.push('残りわずか');
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[1]);
     } else if (idx === 2) {
       circleName = '【目玉03】深夜喫茶';
       circleKana = 'シンヤキッサ';
-      items = Array.from({ length: 12 }, (_, k) => ({
-        name: `${mainMember} ${THEME_WORDS[k % THEME_WORDS.length]} ${GOODS_TYPES[k % GOODS_TYPES.length]}`,
-        price: GOODS_PRICES[k % GOODS_PRICES.length],
-        note: k === 11 ? '新作' : ''
-      }));
+      items = Array.from({ length: 12 }, (_, k) => {
+        const gType = GOODS_TYPES[k % GOODS_TYPES.length];
+        return {
+          name: `${mainMember} ${THEME_WORDS[k % THEME_WORDS.length]} ${gType}`,
+          price: GOODS_PRICES[k % GOODS_PRICES.length],
+          note: k === 11 ? '新作' : '',
+          characters: [mainMember],
+          goods_types: [ITEM_LABEL_TO_GOODS_TYPE[gType] || 'その他'],
+          attributes: gType === 'ステッカーセット' ? ['セット'] : []
+        };
+      });
       tags.push('新刊あり', 'グッズ');
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[2]);
     } else if (idx === 3) {
@@ -310,13 +337,13 @@ export function generateMockEventData({
       twitterId = null;
       pixivUrl = null;
       siteUrl = '';
-      items = [{ name: `${mainMember} さんぽ 新刊漫画本`, price: 800, note: '' }];
+      items = [{ name: `${mainMember} さんぽ 新刊漫画本`, price: 800, note: '', characters: [mainMember], goods_types: ['漫画本'], attributes: [] }];
     } else if (idx === 4) {
       circleName = '【目玉05】しろつめくさ無配屋';
       circleKana = 'シロツメクサムハイヤ';
       items = [
-        { name: `${mainMember} 無料配布 ペーパー`, price: 0, note: '無料配布' },
-        { name: `${mainMember} ポストカード`, price: 0, note: '無料配布' }
+        { name: `${mainMember} 無料配布 ペーパー`, price: 0, note: '無料配布', characters: [mainMember], goods_types: ['ペーパー'], attributes: ['無料配布'] },
+        { name: `${mainMember} ポストカード`, price: 0, note: '無料配布', characters: [mainMember], goods_types: ['ポストカード'], attributes: ['無料配布'] }
       ];
       tags.push('無料配布');
       oshinagakiUrl = '/icons/icon.svg';
@@ -326,7 +353,10 @@ export function generateMockEventData({
       items = [{
         name: `${mainMember} ゆめかわ＆お泊まり会記念の非常に長い40文字級フルカラー特別総集編イラスト本`,
         price: 1500,
-        note: ''
+        note: '',
+        characters: [mainMember],
+        goods_types: ['イラスト本'],
+        attributes: []
       }];
       tags.push('新刊あり');
       circleComment = buildLongComment(circleName);
@@ -336,8 +366,8 @@ export function generateMockEventData({
       circleKana = 'カミヒコウキゴウドウインサツブ';
       spaceCount = '2';
       items = [
-        { name: `${mainMember} ハロウィン 新刊 合同誌`, price: 1200, note: '2スペース合同' },
-        { name: `${mainMember} チェキ風カード`, price: 300, note: '' }
+        { name: `${mainMember} ハロウィン 新刊 合同誌`, price: 1200, note: '2スペース合同', characters: [mainMember], goods_types: ['合同誌'], attributes: [] },
+        { name: `${mainMember} チェキ風カード`, price: 300, note: '', characters: [mainMember], goods_types: ['カード'], attributes: [] }
       ];
       tags.push('合同誌', '新刊あり');
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[4]);
@@ -345,8 +375,8 @@ export function generateMockEventData({
       circleName = '【目玉08】彗星豪華セット本舗';
       circleKana = 'スイセイゴウカセットホンポ';
       items = [
-        { name: `${mainMember} お正月 新刊グッズ豪華セット`, price: 5000, note: '新刊+アクスタ+トート' },
-        { name: `${mainMember} クリアファイル`, price: 500, note: '' }
+        { name: `${mainMember} お正月 新刊グッズ豪華セット`, price: 5000, note: '新刊+アクスタ+トート', characters: [mainMember], goods_types: ['イラスト本', 'アクリルスタンド', 'バッグ'], attributes: ['セット'] },
+        { name: `${mainMember} クリアファイル`, price: 500, note: '', characters: [mainMember], goods_types: ['クリアファイル'], attributes: [] }
       ];
       tags.push('新刊セット', 'グッズ');
       oshinagakiUrl = buildMockOshinagakiSvg(spaceKey, circleName, PALETTE_COLORS[5]);
@@ -411,29 +441,47 @@ export function generateMockEventData({
         const theme = pick(THEME_WORDS);
         let itemName = '';
         let price = 1000;
+        let itemChars = [pickedMembers[k % pickedMembers.length]];
+        let itemGoodsTypes = ['その他'];
+        let itemAttributes = [];
 
         if (isZeroOnly) {
-          itemName = `${mainMember} ${theme} 無料配布ペーパー`;
+          itemName = `${itemChars[0]} ${theme} 無料配布ペーパー`;
           price = 0;
+          itemGoodsTypes = ['ペーパー'];
+          itemAttributes = ['無料配布'];
         } else if (isHighSet && k === 0) {
-          itemName = `${mainMember} ${theme} 新刊豪華セット`;
+          itemName = `${itemChars[0]} ${theme} 新刊豪華セット`;
           price = 5000;
+          itemGoodsTypes = ['イラスト本', 'アクリルスタンド'];
+          itemAttributes = ['セット'];
         } else if (k === 0) {
-          itemName = `${mainMember} ${theme} ${pick(BOOK_TYPES)}`;
+          const bt = pick(BOOK_TYPES);
+          itemName = `${itemChars[0]} ${theme} ${bt}`;
           price = pick(BOOK_PRICES);
+          itemGoodsTypes = [ITEM_LABEL_TO_GOODS_TYPE[bt] || 'イラスト本'];
+          if (bt === '無料配布 ペーパー' || price === 0) itemAttributes = ['無料配布'];
         } else if (rng() < 0.45) {
-          itemName = `${mainMember} ${theme} ${pick(BOOK_TYPES)}`;
+          const bt = pick(BOOK_TYPES);
+          itemName = `${itemChars[0]} ${theme} ${bt}`;
           price = pick(BOOK_PRICES);
+          itemGoodsTypes = [ITEM_LABEL_TO_GOODS_TYPE[bt] || 'イラスト本'];
+          if (bt === '無料配布 ペーパー' || price === 0) itemAttributes = ['無料配布'];
         } else if (rng() < 0.85) {
-          itemName = `${mainMember} ${theme} ${pick(GOODS_TYPES)}`;
+          const gt = pick(GOODS_TYPES);
+          itemName = `${itemChars[0]} ${theme} ${gt}`;
           price = pick(GOODS_PRICES);
+          itemGoodsTypes = [ITEM_LABEL_TO_GOODS_TYPE[gt] || 'その他'];
+          if (gt === 'ステッカーセット') itemAttributes = ['セット'];
         } else {
-          itemName = `${mainMember} ${theme} 新刊グッズセット`;
+          itemName = `${itemChars[0]} ${theme} 新刊グッズセット`;
           price = pick(SET_PRICES);
+          itemGoodsTypes = ['イラスト本', 'アクリルスタンド'];
+          itemAttributes = ['セット'];
         }
 
         if (idx === 22 && k === 0) {
-          itemName = `${mainMember} ${theme}の40文字級超長文頒布物タイトル表示テスト用イラスト記念本`;
+          itemName = `${itemChars[0]} ${theme}の40文字級超長文頒布物タイトル表示テスト用イラスト記念本`;
         }
 
         const itemSoldout = allCircleSoldout || rng() < 0.15;
@@ -441,8 +489,74 @@ export function generateMockEventData({
           name: itemName,
           price,
           soldout: itemSoldout,
-          note: itemSoldout ? '完売' : (price === 0 ? '無料配布' : '')
+          note: itemSoldout ? '完売' : (price === 0 ? '無料配布' : ''),
+          characters: itemChars,
+          units: [],
+          goods_types: itemGoodsTypes,
+          attributes: itemAttributes
         });
+      }
+
+      // ユニット＆掛け合わせ検証用の固定ケース（idx = 8, 9, 10）
+      if (idx === 8) {
+        items = [
+          {
+            name: 'はなばな ゆめかわ アクリルスタンド',
+            price: 1500,
+            soldout: false,
+            note: 'ユニット検証用（はなばな）',
+            characters: ['橘ひなの', '英リサ'],
+            units: ['はなばな'],
+            goods_types: ['アクリルスタンド'],
+            attributes: []
+          },
+          {
+            name: '英リサ 単体缶バッジ',
+            price: 500,
+            soldout: false,
+            note: '掛け合わせ不一致検証用（橘ひなの×缶バッジでは非ヒット）',
+            characters: ['英リサ'],
+            units: [],
+            goods_types: ['缶バッジ'],
+            attributes: []
+          }
+        ];
+      } else if (idx === 9) {
+        items = [
+          {
+            name: 'BIG☆STAR おでかけ 記念セット',
+            price: 3000,
+            soldout: false,
+            note: 'characters空→白雪レイド自動展開検証用',
+            characters: [],
+            units: ['BIG☆STAR'],
+            goods_types: ['Tシャツ', 'ステッカー'],
+            attributes: ['セット']
+          }
+        ];
+      } else if (idx === 10) {
+        items = [
+          {
+            name: '夜乃くろむ 新刊アクリルスタンドセット',
+            price: 2500,
+            soldout: false,
+            note: 'キャラ×セット掛け合わせ確認用',
+            characters: ['夜乃くろむ'],
+            units: [],
+            goods_types: ['アクリルスタンド'],
+            attributes: ['セット']
+          },
+          {
+            name: '花芽すみれ 単体ポストカード',
+            price: 300,
+            soldout: false,
+            note: '花芽すみれ×セットでは非ヒット確認用',
+            characters: ['花芽すみれ'],
+            units: [],
+            goods_types: ['ポストカード'],
+            attributes: []
+          }
+        ];
       }
 
       // お品書き画像: 70%あり / 30%なし
@@ -482,11 +596,16 @@ export function generateMockEventData({
       circlecut
     });
 
+    const normalizedItems = items.map(normalizeItemRecord);
+    const agg = aggregateCircleTagsFromItems(normalizedItems);
+    const mergedTags = Array.from(new Set([...tags, ...agg.tags]));
+    const mergedMembers = agg.members.length > 0 ? agg.members : pickedMembers;
+
     extraInfo[circleId] = {
-      tags,
-      members: pickedMembers,
+      tags: mergedTags,
+      members: mergedMembers,
       oshinagaki_url: oshinagakiUrl,
-      items,
+      items: normalizedItems,
       twitter_id: twitterId || '',
       staff_twitter: '',
       is_absent: isAbsent,
