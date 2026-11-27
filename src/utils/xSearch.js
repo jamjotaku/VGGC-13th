@@ -1,11 +1,6 @@
 /**
- * X (旧Twitter) のリアルタイム検索・速報ディープリンク生成ユーティリティ
- * すべて `&f=live` (最新順) を指定して現地での即時性を最大化
+ * X (旧Twitter) アカウント文字列・お品書きURL パースユーティリティ
  */
-
-import { EVENT_CONFIG } from '../eventConfig';
-
-const BASE_X_SEARCH_URL = 'https://x.com/search';
 
 /**
  * Twitter IDから余分な@や空白を除去
@@ -21,7 +16,7 @@ export const cleanTwitterHandle = (id) => {
  * - "たなか:tanaka_id", "たなか：tanaka_id"
  * - "たなか(@tanaka_id)", "たなか（@tanaka_id）"
  * - "@tanaka_id", "tanaka_id"
- * @param {string} token 
+ * @param {string} token
  * @returns {{ name: string | null, handle: string } | null}
  */
 export const parseSingleTwitterAccount = (token) => {
@@ -56,7 +51,7 @@ export const parseSingleTwitterAccount = (token) => {
 
 /**
  * カンマ・読点・改行（または空白）区切りの文字列からアカウント配列 ({ name, handle }) を抽出
- * @param {string} rawStr 
+ * @param {string} rawStr
  * @returns {Array<{ name: string | null, handle: string }>}
  */
 export const parseTwitterAccounts = (rawStr) => {
@@ -99,7 +94,7 @@ export const parseStaffTwitterIds = parseTwitterHandles;
 
 /**
  * 代表ペンネームが連名 (例: "ムチムチP, カリカリ大学芋", "A / B", "A & B") の場合に分割
- * @param {string} pennameStr 
+ * @param {string} pennameStr
  * @returns {string[]}
  */
 export const splitPennames = (pennameStr) => {
@@ -141,7 +136,7 @@ export const getCircleAuthorAccounts = (circle, extraInfo = null) => {
 
 /**
  * 売り子 (複数人) のアカウント情報配列を取得
- * @param {Object} extraInfo 
+ * @param {Object} extraInfo
  * @returns {Array<{ name: string | null, handle: string }>}
  */
 export const getCircleStaffAccounts = (extraInfo = null) => {
@@ -150,94 +145,22 @@ export const getCircleStaffAccounts = (extraInfo = null) => {
 };
 
 /**
- * サークル主 (合同サークル含む複数人) の Twitter ID 配列を取得 (公式速報検索用)
+ * サークル主 (合同サークル含む複数人) の Twitter ID 配列を取得
  */
 export const getCircleAuthorTwitterIds = (circle, extraInfo = null) => {
   return getCircleAuthorAccounts(circle, extraInfo).map(a => a.handle);
 };
 
 /**
- * 売り子 (複数人) の Twitter ID 配列を取得 (公式速報検索用)
+ * 売り子 (複数人) の Twitter ID 配列を取得
  */
 export const getCircleStaffTwitterIds = (extraInfo = null) => {
   return getCircleStaffAccounts(extraInfo).map(a => a.handle);
 };
 
 /**
- * サークル主 (合同サークル主含む) ＆ 売り子による最新公式アナウンス・完売・在庫告知を検索するURLを生成
- * @param {Object} circle サークル情報 (twitter_id, circle_name, space_sym, space_num 等)
- * @param {Object} extraInfo Supabaseの追加情報 (twitter_id, staff_twitter 等)
- */
-export const getCircleOfficialSearchUrl = (circle, extraInfo = null) => {
-  if (!circle) return '';
-
-  const keywords = '(完売 OR 終了 OR 列 OR 在庫 OR 頒布 OR なくなり OR 残り OR お品書き OR 完売報告 OR 設営完了)';
-
-  // 1. サークル主IDの取得 (合同サークルの複数IDもすべてパース)
-  const authorIds = getCircleAuthorTwitterIds(circle, extraInfo);
-
-  // 2. 売り子IDの取得
-  const staffIds = getCircleStaffTwitterIds(extraInfo);
-
-  // 全公式IDリスト (サークル主 + 合同サークル主 + 売り子)
-  const allOfficialIds = Array.from(new Set([...authorIds, ...staffIds].filter(Boolean)));
-
-  let query = '';
-
-  if (allOfficialIds.length > 0) {
-    // 【公式ID指定モード】サークル主（合同サークル含む）または売り子のアカウントからの投稿をピンポイント抽出
-    const fromConditions = allOfficialIds.map(id => `from:${id}`).join(' OR ');
-    query = `(${fromConditions}) ${keywords}`;
-  } else {
-    // 【フェイルセーフ複合クエリモード】ID未登録でも同名の一般日常ツイートを100%弾く
-    const spaceWithHyphen = `${circle.space_sym}-${circle.space_num}`;
-    const circleName = circle.circle_name;
-    const penname = circle.penname || '';
-    
-    query = `("${circleName}" OR "${penname}") ("${spaceWithHyphen}" OR "${EVENT_CONFIG.hashtag}") ${keywords}`;
-  }
-
-  return `${BASE_X_SEARCH_URL}?q=${encodeURIComponent(query)}&f=live`;
-};
-
-/**
- * 一般参加者によるサークルの口コミ・目撃情報・列状況を検索するURLを生成
- * @param {Object} circle サークル情報 (circle_name, space_sym, space_num)
- */
-export const getCirclePublicSearchUrl = (circle) => {
-  if (!circle) return '';
-
-  const spaceWithHyphen = `${circle.space_sym}-${circle.space_num}`;
-  const spaceCompact = `${circle.space_sym}${circle.space_num}`;
-  const circleName = circle.circle_name;
-
-  // サークル名 または スペース番号、かつ 完売/列/最後尾 などの現地ワード
-  const query = `("${circleName}" OR "${spaceWithHyphen}" OR "${spaceCompact}") (完売 OR 列 OR 最後尾 OR 売り切れ OR 並び OR 混雑)`;
-
-  return `${BASE_X_SEARCH_URL}?q=${encodeURIComponent(query)}&f=live`;
-};
-
-/**
- * 会場全体（EVENT_CONFIG.hashtag）のカテゴリ別リアルタイム速報URLを生成
- * @param {'soldout' | 'line' | 'all'} type 
- */
-export const getEventLiveSearchUrl = (type = 'all') => {
-  const tag = EVENT_CONFIG.hashtag;
-  let query = tag;
-
-  if (type === 'soldout') {
-    query = `${tag} (完売 OR 売り切れ OR 終了 OR なくなった)`;
-  } else if (type === 'line') {
-    query = `${tag} (列 OR 最後尾 OR 待機列 OR 混雑 OR シャッター)`;
-  }
-
-  return `${BASE_X_SEARCH_URL}?q=${encodeURIComponent(query)}&f=live`;
-};
-
-
-/**
  * 複数のお品書きURL文字列（改行・カンマ・空白区切り）をパースし、有効なURLの配列を返す
- * @param {string|string[]|null} rawUrls 
+ * @param {string|string[]|null} rawUrls
  * @returns {string[]}
  */
 export const parseOshinagakiUrls = (rawUrls) => {
@@ -278,7 +201,7 @@ export const parseOshinagakiUrls = (rawUrls) => {
 
 /**
  * 単一のお品書きURLの種類（Pixiv、X/Twitter、その他）とIDを解析
- * @param {string} url 
+ * @param {string} url
  * @returns {{ type: 'pixiv' | 'x' | 'other', id: string | null, url: string }}
  */
 export const parseOshinagakiUrlType = (url) => {

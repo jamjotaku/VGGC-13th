@@ -425,19 +425,12 @@
               <button @click="showPcBlockPanel = !showPcBlockPanel"
                       class="text-[11px] font-extrabold text-gray-700 hover:text-gray-900 flex items-center gap-1 cursor-pointer select-none">
                 <span>🧭</span>
-                <span>配置ブロック ＆ 会場X速報</span>
+                <span>配置ブロック</span>
                 <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" :class="showPcBlockPanel ? '' : 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
               </button>
               <button v-if="filterBlock" @click="selectBlockAndFocusMap(filterBlock)" class="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer">
                 解除 ({{ filterBlock }})
               </button>
-            </div>
-
-            <!-- 折りたたみ中も会場速報リンクへ即アクセス可能 -->
-            <div v-if="!showPcBlockPanel" class="flex items-center gap-1">
-              <a :href="getEventLiveSearchUrl('soldout')" target="_blank" class="px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded text-[10px] font-bold">💔完売</a>
-              <a :href="getEventLiveSearchUrl('line')" target="_blank" class="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded text-[10px] font-bold">🚶列</a>
-              <a :href="getEventLiveSearchUrl('all')" target="_blank" class="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded text-[10px] font-bold">📢速報</a>
             </div>
           </div>
 
@@ -448,26 +441,6 @@
                       :class="filterBlock === block ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300' : 'bg-white text-gray-700 border border-gray-200 hover:bg-blue-50 hover:border-blue-200'">
                 {{ block }}
               </button>
-            </div>
-
-            <div class="pt-1.5 border-t border-gray-200/70 flex items-center justify-between gap-2">
-              <span class="text-[11px] font-extrabold text-slate-700 flex items-center gap-1 shrink-0">
-                <span class="text-amber-500">⚡</span>会場X速報:
-              </span>
-              <div class="grid grid-cols-3 gap-1.5 flex-1">
-                <a :href="getEventLiveSearchUrl('soldout')" target="_blank" 
-                   class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
-                  <span>💔 完売</span>
-                </a>
-                <a :href="getEventLiveSearchUrl('line')" target="_blank" 
-                   class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
-                  <span>🚶 列情報</span>
-                </a>
-                <a :href="getEventLiveSearchUrl('all')" target="_blank" 
-                   class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition">
-                  <span>📢 {{ EVENT_CONFIG.hashtag }}</span>
-                </a>
-              </div>
             </div>
           </div>
         </div>
@@ -1173,14 +1146,6 @@
                     <span v-if="circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length">📸 お品書き・頒布物を見る</span>
                     <span v-else>📄 詳細・関連サークル</span>
                   </button>
-
-                  <!-- 公式速報ボタン -->
-                  <a :href="getCircleOfficialSearchUrl(circle, circleExtraInfo[circle.circle_id])" target="_blank"
-                     class="min-h-[36px] flex items-center justify-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-800 px-3 py-1.5 rounded-xl font-bold border border-blue-200 transition active:scale-95"
-                     title="サークル主・売り子の最新ツイートから完売・在庫・お品書き情報を検索">
-                    <span class="text-amber-500">⚡</span>
-                    <span>公式速報</span>
-                  </a>
                 </div>
               </li>
             </ul>
@@ -1340,25 +1305,6 @@
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <!-- ★ 会場Xリアルタイム速報チップ (スマホ用・スリム化OFF時のみ表示) -->
-              <div v-show="!isListHeaderSlim" class="md:hidden flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs custom-scrollbar">
-                <span class="text-[10px] font-bold text-gray-600 shrink-0 flex items-center gap-1">
-                  <span class="text-amber-500 font-black">⚡</span>会場速報:
-                </span>
-                <a :href="getEventLiveSearchUrl('soldout')" target="_blank" 
-                   class="shrink-0 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
-                  <span>💔 完売情報</span>
-                </a>
-                <a :href="getEventLiveSearchUrl('line')" target="_blank" 
-                   class="shrink-0 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
-                  <span>🚶 列・最後尾</span>
-                </a>
-                <a :href="getEventLiveSearchUrl('all')" target="_blank" 
-                   class="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition">
-                  <span>📢 {{ EVENT_CONFIG.hashtag }} 最新</span>
-                </a>
               </div>
             </div>
 
@@ -1657,30 +1603,16 @@
                         </div>
                       </div>
 
-                      <!-- 情報確認ボタンバー（お品書き・公式速報・目撃/列：押しやすいサイズに統一） -->
-                      <div class="grid grid-cols-3 gap-1.5 pt-1">
+                      <!-- 情報確認ボタンバー（お品書き・詳細） -->
+                      <div class="pt-1">
                         <button @click="openDetails(circle)"
-                                class="min-h-[38px] flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded-xl font-bold border transition shadow-sm active:scale-95 cursor-pointer"
+                                class="w-full min-h-[38px] flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded-xl font-bold border transition shadow-sm active:scale-95 cursor-pointer"
                                 :class="(circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length)
                                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
                                   : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'">
                           <span>📸</span>
-                          <span class="truncate">{{ (circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length) ? 'お品書き' : '詳細/X' }}</span>
+                          <span class="truncate">{{ (circleExtraInfo[circle.circle_id]?.oshinagaki_url || circleExtraInfo[circle.circle_id]?.items?.length) ? 'お品書き・頒布物を見る' : '詳細を見る' }}</span>
                         </button>
-
-                        <a :href="getCircleOfficialSearchUrl(circle, circleExtraInfo[circle.circle_id])" target="_blank"
-                           class="min-h-[38px] flex items-center justify-center gap-1 text-xs bg-blue-50 text-blue-800 hover:bg-blue-100 px-2 py-1.5 rounded-xl font-bold border border-blue-200 transition shadow-sm active:scale-95"
-                           title="サークル主・売り子の最新ツイートから完売・在庫・列情報を検索">
-                          <span class="text-amber-500">⚡</span>
-                          <span class="truncate">公式速報</span>
-                        </a>
-
-                        <a :href="getCirclePublicSearchUrl(circle)" target="_blank"
-                           class="min-h-[38px] flex items-center justify-center gap-1 text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-xl font-bold border border-gray-200 transition shadow-sm active:scale-95"
-                           title="参加者の目撃ツイートから完売や最後尾情報を検索">
-                          <span>👥</span>
-                          <span class="truncate">目撃/列</span>
-                        </a>
                       </div>
                     </div>
                     
@@ -1918,7 +1850,7 @@ import { EVENT_CONFIG } from './eventConfig';
 import { calculateCurrencyBreakdown } from './utils/currency';
 import { getEventCountdown, checkScheduleActive } from './utils/countdown';
 import { getMemberStyle, getMemberMark } from './utils/memberStyle';
-import { getCircleOfficialSearchUrl, getCirclePublicSearchUrl, getEventLiveSearchUrl, getCircleAuthorTwitterIds, getCircleStaffTwitterIds, getCircleAuthorAccounts, getCircleStaffAccounts, parseOshinagakiUrls, parseOshinagakiUrlType } from './utils/xSearch';
+import { getCircleAuthorTwitterIds, getCircleStaffTwitterIds, getCircleAuthorAccounts, getCircleStaffAccounts, parseOshinagakiUrls, parseOshinagakiUrlType } from './utils/xSearch';
 
 import BudgetModal from './components/BudgetModal.vue';
 import MemoDashboard from './components/MemoDashboard.vue';
