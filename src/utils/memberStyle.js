@@ -1,4 +1,7 @@
 import { vspoDict } from '../constants';
+import { UNIT_VOCAB } from './itemTags';
+
+const UNIT_SET = new Set(UNIT_VOCAB);
 
 const findMember = (name) => {
   if (!name) return null;
@@ -30,6 +33,9 @@ export const getMemberMark = (name) => {
   const found = findMember(name);
   if (found && found.fanmarks && found.fanmarks.length > 0) {
     return found.fanmarks.join('');
+  }
+  if (UNIT_SET.has(String(name || '').trim())) {
+    return '👥';
   }
   return '👤';
 };

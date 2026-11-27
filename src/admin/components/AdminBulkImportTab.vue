@@ -99,6 +99,7 @@ const loadSample = () => {
           price: 2000,
           note: 'BIGアクリルスタンド（約18cm）とチェキ風箔カードのセット',
           characters: ['夜乃くろむ'],
+          units: [],
           goods_types: ['アクリルスタンド', 'カード'],
           attributes: ['セット']
         }

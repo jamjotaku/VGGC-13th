@@ -24,6 +24,25 @@ export const GOODS_TYPE_VOCAB = [
 
 export const ATTRIBUTE_VOCAB = ['セット', 'ランダム', '購入特典', '無料配布'];
 
+// 確立したユニット語彙リスト（初版・じゃむじゃ提供 11ユニット）
+export const UNIT_DICT = [
+  { name: '花芽姉妹', aliases: [], members: ['花芽すみれ', '花芽なずな'] },
+  { name: 'LVG', aliases: ['Lupinus Virtual Games'], members: ['花芽すみれ', '花芽なずな', '小雀とと', '一ノ瀬うるは'] },
+  { name: 'IBG', aliases: ['Iris Black Games'], members: ['胡桃のあ', '橘ひなの', '如月れん'] },
+  { name: 'CRG', aliases: ['Cattleya Regina Games'], members: ['空澄セナ', '兎咲ミミ', '英リサ'] },
+  { name: 'ひねもす', aliases: [], members: ['夜乃くろむ', '紡木こかげ', '千燈ゆうひ'] },
+  { name: 'ちーサイ', aliases: [], members: ['銀城サイネ', '龍巻ちせ'] },
+  { name: 'BIG☆STAR', aliases: [], members: ['一ノ瀬うるは', '小森めと', '白雪レイド'] },
+  { name: 'OTBN', aliases: [], members: ['一ノ瀬うるは', '橘ひなの', '八雲べに'] },
+  { name: 'なちゅらりー', aliases: [], members: ['花芽なずな', '胡桃のあ', '猫汰つな', '白波らむね', '小森めと'] },
+  { name: 'Cafunēs', aliases: ['Cafunes'], members: ['胡桃のあ', '空澄セナ', '夜乃くろむ'] },
+  { name: 'はなばな', aliases: [], members: ['橘ひなの', '英リサ'] }
+];
+
+export const UNIT_VOCAB = UNIT_DICT.map((u) => u.name);
+
+const UNIT_MAP = new Map(UNIT_DICT.map((u) => [u.name, u]));
+
 const GOODS_TYPE_SET = new Set(GOODS_TYPE_VOCAB);
 const ATTRIBUTE_SET = new Set(ATTRIBUTE_VOCAB);
 
@@ -54,17 +73,28 @@ function toStringArray(val) {
  */
 export function normalizeItemRecord(raw) {
   if (!raw || typeof raw !== 'object') {
-    return { name: '', price: 0, note: '', characters: [], goods_types: [], attributes: [] };
+    return { name: '', price: 0, note: '', characters: [], units: [], goods_types: [], attributes: [] };
   }
   const goodsTypes = raw.goods_types !== undefined
     ? toStringArray(raw.goods_types)
     : toStringArray(raw.goods_type);
 
+  const units = toStringArray(raw.units);
+  const charSet = new Set(toStringArray(raw.characters));
+  // 確立ユニットが指定された場合、構成メンバーを characters へ自動補完（重複排除）
+  units.forEach((u) => {
+    const def = UNIT_MAP.get(u);
+    if (def && Array.isArray(def.members)) {
+      def.members.forEach((m) => charSet.add(m));
+    }
+  });
+
   const normalized = {
     name: String(raw.name || '').trim(),
     price: Math.max(0, Number(raw.price) || 0),
     note: String(raw.note || '').trim(),
-    characters: toStringArray(raw.characters),
+    characters: Array.from(charSet),
+    units,
     goods_types: goodsTypes,
     attributes: toStringArray(raw.attributes)
   };
@@ -75,7 +105,7 @@ export function normalizeItemRecord(raw) {
 }
 
 /**
- * items 配列からサークル単位の members / tags を自動集約（二重管理防止）
+ * items 配列からサークル単位の members（個人名＋ユニット名） / tags を自動集約（二重管理防止）
  */
 export function aggregateCircleTagsFromItems(items = []) {
   const memberSet = new Set();
@@ -84,6 +114,7 @@ export function aggregateCircleTagsFromItems(items = []) {
   for (const raw of items || []) {
     const it = normalizeItemRecord(raw);
     it.characters.forEach((c) => memberSet.add(c));
+    it.units.forEach((u) => memberSet.add(u));
     it.goods_types.forEach((g) => tagSet.add(g));
     it.attributes.forEach((a) => tagSet.add(a));
   }
@@ -95,20 +126,37 @@ export function aggregateCircleTagsFromItems(items = []) {
 }
 
 /**
- * 統制語彙チェック（未知のキャラ名・グッズ種類・属性タグを検出して警告を返す）
+ * 統制語彙チェック（未知のキャラ名・ユニット名・グッズ種類・属性タグを検出して警告を返す）
+ * ※ units に指定されたユニットの構成メンバー（例: BIG☆STAR の 白雪レイド）は vspoDict 外でも許可する
  */
-export function validateItemsVocabulary(items = [], validCharacters = []) {
+export function validateItemsVocabulary(items = [], validCharacters = [], validUnits = UNIT_VOCAB) {
   const charSet = new Set((validCharacters || []).map((c) => String(c).trim()).filter(Boolean));
+  const unitSet = new Set((validUnits || []).map((u) => String(u).trim()).filter(Boolean));
   const warnings = [];
 
   (items || []).forEach((raw, idx) => {
     const it = normalizeItemRecord(raw);
     const label = it.name || `品目#${idx + 1}`;
 
+    const unitDerivedChars = new Set();
+    it.units.forEach((u) => {
+      const def = UNIT_MAP.get(u);
+      if (def && Array.isArray(def.members)) {
+        def.members.forEach((m) => unitDerivedChars.add(m));
+      }
+    });
+
     if (charSet.size > 0) {
       it.characters.forEach((c) => {
-        if (!charSet.has(c)) {
+        if (!charSet.has(c) && !unitDerivedChars.has(c)) {
           warnings.push(`[${label}] 未登録キャラ名: "${c}"`);
+        }
+      });
+    }
+    if (unitSet.size > 0) {
+      it.units.forEach((u) => {
+        if (!unitSet.has(u)) {
+          warnings.push(`[${label}] 未登録ユニット名: "${u}"`);
         }
       });
     }
@@ -150,6 +198,7 @@ export function matchesCircleQueryAndTags(circle, extra = {}, { query = '', sele
       normalizeSearchText(it.name).includes(nq) ||
       normalizeSearchText(it.note).includes(nq) ||
       it.characters.some((c) => normalizeSearchText(c).includes(nq)) ||
+      it.units.some((u) => normalizeSearchText(u).includes(nq)) ||
       it.goods_types.some((g) => normalizeSearchText(g).includes(nq)) ||
       it.attributes.some((a) => normalizeSearchText(a).includes(nq))
     );
@@ -163,21 +212,21 @@ export function matchesCircleQueryAndTags(circle, extra = {}, { query = '', sele
   if (!hasMemberFilter && !hasTagFilter) return true;
 
   const hasTaggedItems = items.some(
-    (it) => it.characters.length > 0 || it.goods_types.length > 0 || it.attributes.length > 0
+    (it) => it.characters.length > 0 || it.units.length > 0 || it.goods_types.length > 0 || it.attributes.length > 0
   );
 
-  // キャラ＋グッズ種類の掛け合わせ時、品目タグがあるサークルは「同一品目で両方一致」を厳密判定
+  // キャラ/ユニット＋グッズ種類の掛け合わせ時、品目タグがあるサークルは「同一品目で両方一致」を厳密判定
   if (hasMemberFilter && hasTagFilter && hasTaggedItems) {
     return items.some((it) => {
-      const itemCharOk = selectedMembers.some((m) => it.characters.includes(m));
+      const itemCharOrUnitOk = selectedMembers.some((m) => it.characters.includes(m) || it.units.includes(m));
       const itemTagOk = it.goods_types.includes(filterItemTag) || it.attributes.includes(filterItemTag);
-      return itemCharOk && itemTagOk;
+      return itemCharOrUnitOk && itemTagOk;
     });
   }
 
   const circleMembers = new Set([
     ...(Array.isArray(extra?.members) ? extra.members : []),
-    ...items.flatMap((it) => it.characters)
+    ...items.flatMap((it) => [...it.characters, ...it.units])
   ]);
   const circleTags = new Set([
     ...(Array.isArray(extra?.tags) ? extra.tags : []),
