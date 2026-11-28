@@ -22,8 +22,10 @@
       </div>
 
       <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-extrabold text-slate-700">プレビュー ({{ matchedRows.length }}件マッチ)</span>
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <span class="text-xs font-extrabold text-slate-700">
+            プレビュー ({{ matchedRows.length }}件マッチ<template v-if="unmatchedRows.length > 0"> / 未マッチ {{ unmatchedRows.length }}件</template>)
+          </span>
           <button v-if="matchedRows.length > 0"
                   @click="applyImport"
                   class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl cursor-pointer">
@@ -35,30 +37,61 @@
           ⚠️ {{ parseError }}
         </div>
 
+        <!-- 未マッチレコード一覧（件数と space / circle_id） -->
+        <div v-if="unmatchedRows.length > 0" class="p-3 bg-rose-50/80 border border-rose-200 rounded-xl space-y-1.5 text-xs">
+          <div class="font-extrabold text-rose-900">
+            ⚠️ サークル未マッチ ({{ unmatchedRows.length }}件):
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span v-for="u in unmatchedRows" :key="u.key"
+                  class="px-2 py-0.5 rounded bg-white border border-rose-300 text-rose-800 font-mono text-[11px] font-bold">
+              {{ u.label }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 未マッチレコードの統制語彙チェック警告（別枠表示） -->
+        <div v-if="unmatchedVocabWarnings.length > 0" class="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-1 text-[11px] text-amber-950">
+          <div class="font-extrabold">
+            ⚠️ 未マッチ分の統制語彙チェック警告 ({{ unmatchedVocabWarnings.length }}件):
+          </div>
+          <div v-for="(uw, uwIdx) in unmatchedVocabWarnings" :key="uwIdx">
+            ・<span class="font-mono font-bold">[{{ uw.recordLabel }}]</span> {{ uw.message }}
+          </div>
+        </div>
+
         <div class="max-h-80 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
           <div v-for="row in matchedRows" :key="row.circle_id" class="p-2.5 text-xs space-y-1">
-            <div class="flex items-center justify-between gap-2">
-              <div class="font-extrabold text-slate-900">
-                <span class="font-mono text-blue-700 mr-1">[{{ row.spaceLabel }}]</span>
-                {{ row.circle_name }}
+            <div class="flex items-start gap-2.5">
+              <img v-if="row.cutImageUrl"
+                   :src="row.cutImageUrl"
+                   alt="カット"
+                   class="w-11 h-14 object-cover rounded border border-slate-200 bg-slate-100 shrink-0" />
+              <div class="flex-1 min-w-0 space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-extrabold text-slate-900 truncate">
+                    <span class="font-mono text-blue-700 mr-1">[{{ row.spaceLabel }}]</span>
+                    {{ row.circle_name }}
+                  </div>
+                  <span v-if="row.items?.length" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px] shrink-0">
+                    品目 {{ row.items.length }}件
+                  </span>
+                </div>
+                <div class="text-[11px] text-slate-600 truncate">
+                  X: {{ row.twitterId || '-' }} / URL: {{ row.url || '-' }}
+                </div>
+                <div v-if="row.membersInput || row.tagsInput" class="text-[11px] text-slate-700">
+                  <span v-if="row.membersInput" class="mr-2">👤 {{ row.membersInput }}</span>
+                  <span v-if="row.tagsInput">🏷️ {{ row.tagsInput }}</span>
+                </div>
               </div>
-              <span v-if="row.items?.length" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">
-                品目 {{ row.items.length }}件
-              </span>
-            </div>
-            <div class="text-[11px] text-slate-600 truncate">
-              X: {{ row.twitterId || '-' }} / URL: {{ row.url || '-' }}
-            </div>
-            <div v-if="row.membersInput || row.tagsInput" class="text-[11px] text-slate-700">
-              <span v-if="row.membersInput" class="mr-2">👤 {{ row.membersInput }}</span>
-              <span v-if="row.tagsInput">🏷️ {{ row.tagsInput }}</span>
             </div>
             <div v-if="row.warnings?.length" class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-0.5">
               <div class="font-extrabold">⚠️ 統制語彙チェック警告 ({{ row.warnings.length }}件):</div>
               <div v-for="(w, wIdx) in row.warnings" :key="wIdx">・{{ w }}</div>
             </div>
           </div>
-          <div v-if="matchedRows.length === 0" class="p-6 text-center text-xs text-slate-400">
+          <div v-if="matchedRows.length === 0 && unmatchedRows.length === 0" class="p-6 text-center text-xs text-slate-400">
             左の入力欄にデータを貼り付けて「解析してプレビュー」を押してください
           </div>
         </div>
@@ -84,6 +117,8 @@ const emit = defineEmits(['apply-import']);
 
 const rawInput = ref('');
 const matchedRows = ref([]);
+const unmatchedRows = ref([]);
+const unmatchedVocabWarnings = ref([]);
 const parseError = ref('');
 const validCharacterNames = vspoDict.map((m) => m.name);
 
@@ -111,6 +146,8 @@ const loadSample = () => {
 const parseInput = () => {
   parseError.value = '';
   matchedRows.value = [];
+  unmatchedRows.value = [];
+  unmatchedVocabWarnings.value = [];
   const text = rawInput.value.trim();
   if (!text) return;
 
@@ -132,19 +169,41 @@ const parseInput = () => {
     }
 
     const results = [];
-    for (const r of records) {
+    const unmatched = [];
+    const unmatchedWarnings = [];
+
+    records.forEach((r, idx) => {
+      const recordLabel = r.space
+        ? String(r.space).trim()
+        : (r.circle_id ? String(r.circle_id).trim() : `行#${idx + 1}`);
+
+      // マッチの成否にかかわらず全レコードの items に統制語彙チェックを先行実行
+      const normalizedItems = Array.isArray(r.items) ? r.items.map(normalizeItemRecord) : undefined;
+      const warnings = normalizedItems
+        ? validateItemsVocabulary(normalizedItems, validCharacterNames)
+        : [];
+
       const target = props.circles.find(c =>
         (r.circle_id && c.circle_id === r.circle_id) ||
         (r.space && `${c.space_sym}-${c.space_num}`.toLowerCase() === String(r.space).trim().toLowerCase())
       );
-      if (!target) continue;
-      const normalizedItems = Array.isArray(r.items) ? r.items.map(normalizeItemRecord) : undefined;
+
+      if (!target) {
+        unmatched.push({
+          key: `unmatched_${idx}_${recordLabel}`,
+          label: recordLabel,
+          space: r.space || '',
+          circleId: r.circle_id || ''
+        });
+        warnings.forEach((msg) => {
+          unmatchedWarnings.push({ recordLabel, message: msg });
+        });
+        return;
+      }
+
       const aggregated = normalizedItems
         ? aggregateCircleTagsFromItems(normalizedItems)
         : { members: [], tags: [] };
-      const warnings = normalizedItems
-        ? validateItemsVocabulary(normalizedItems, validCharacterNames)
-        : [];
 
       const explicitMembers = Array.isArray(r.members) ? r.members : (r.members ? String(r.members).split(/[,、\n]+/).map(s => s.trim()).filter(Boolean) : []);
       const explicitTags = Array.isArray(r.tags) ? r.tags : (r.tags ? String(r.tags).split(/[,、\n]+/).map(s => s.trim()).filter(Boolean) : []);
@@ -158,15 +217,21 @@ const parseInput = () => {
         twitterId: r.twitter_id || '',
         staffTwitter: r.staff_twitter || '',
         url: r.oshinagaki_url || r.url || '',
+        cutImageUrl: r.cut_image_url || r.circlecut || '',
         membersInput: mergedMembers.join(', '),
         tagsInput: mergedTags.join(', '),
         items: normalizedItems,
         warnings
       });
-    }
+    });
+
     matchedRows.value = results;
-    if (results.length === 0) {
-      parseError.value = 'circle_id または space (例: M-15-16) に一致するサークルが見つかりませんでした。';
+    unmatchedRows.value = unmatched;
+    unmatchedVocabWarnings.value = unmatchedWarnings;
+    if (results.length === 0 && unmatched.length === 0) {
+      parseError.value = '解析できるレコードが見つかりませんでした。';
+    } else if (results.length === 0 && unmatched.length > 0) {
+      parseError.value = `全${unmatched.length}件とも circle_id または space に一致するサークルが見つかりませんでした。`;
     }
   } catch (e) {
     parseError.value = e.message || 'データ形式の解析に失敗しました。';
@@ -176,6 +241,8 @@ const parseInput = () => {
 const applyImport = () => {
   emit('apply-import', matchedRows.value);
   matchedRows.value = [];
+  unmatchedRows.value = [];
+  unmatchedVocabWarnings.value = [];
   rawInput.value = '';
 };
 </script>

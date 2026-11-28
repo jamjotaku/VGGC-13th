@@ -155,6 +155,10 @@
                 <!-- 上段 -->
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                    <img v-if="editData[c.circle_id]?.cutImageUrl"
+                         :src="editData[c.circle_id].cutImageUrl"
+                         alt="カット"
+                         class="w-10 h-12 object-cover rounded-lg border border-slate-200 bg-slate-100 shrink-0" />
                     <span class="px-2 py-0.5 rounded-lg bg-slate-900 text-white font-mono font-black text-xs">
                       {{ c.space_sym }}-{{ c.space_num }}
                     </span>
@@ -505,6 +509,7 @@ const loadData = async () => {
         tagsInput: '',
         membersInput: '',
         url: '',
+        cutImageUrl: c.cut_image_url || c.circlecut || '',
         items: [],
         isAbsent: false
       };
@@ -519,6 +524,7 @@ const loadData = async () => {
         initial[info.circle_id].tagsInput = rawTags.filter(t => !String(t).startsWith('__')).join(', ');
         initial[info.circle_id].membersInput = (info.members || []).join(', ');
         initial[info.circle_id].url = info.oshinagaki_url || '';
+        if (info.cut_image_url) initial[info.circle_id].cutImageUrl = info.cut_image_url;
         initial[info.circle_id].items = Array.isArray(info.items) ? info.items : [];
         if (info.twitter_id) initial[info.circle_id].twitterId = info.twitter_id;
         if (info.staff_twitter) initial[info.circle_id].staffTwitter = info.staff_twitter;
@@ -566,6 +572,7 @@ const buildCircleUpsertPayload = (circleId) => {
     twitter_id: d.twitterId || '',
     staff_twitter: d.staffTwitter || '',
     oshinagaki_url: d.url || '',
+    cut_image_url: d.cutImageUrl || '',
     members: parseCommaTokens(d.membersInput),
     tags,
     items: Array.isArray(d.items) ? d.items : [],
@@ -669,6 +676,7 @@ const applyBulkImport = (rows) => {
     if (r.twitterId) d.twitterId = r.twitterId;
     if (r.staffTwitter) d.staffTwitter = r.staffTwitter;
     if (r.url) d.url = r.url;
+    if (r.cutImageUrl) d.cutImageUrl = r.cutImageUrl;
     if (r.membersInput) d.membersInput = r.membersInput;
     if (r.tagsInput) d.tagsInput = r.tagsInput;
     if (Array.isArray(r.items)) d.items = r.items;
@@ -700,6 +708,7 @@ const restoreBackupJson = (rows) => {
     d.twitterId = r.twitter_id || '';
     d.staffTwitter = r.staff_twitter || '';
     d.url = r.oshinagaki_url || '';
+    d.cutImageUrl = r.cut_image_url || '';
     d.membersInput = Array.isArray(r.members) ? r.members.join(', ') : '';
     d.tagsInput = Array.isArray(r.tags) ? r.tags.filter(t => !String(t).startsWith('__')).join(', ') : '';
     d.items = Array.isArray(r.items) ? r.items : [];

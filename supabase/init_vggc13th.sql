@@ -14,12 +14,16 @@ CREATE TABLE IF NOT EXISTS public.circle_info (
   tags jsonb NOT NULL DEFAULT '[]'::jsonb,
   members jsonb NOT NULL DEFAULT '[]'::jsonb,
   oshinagaki_url text,
+  cut_image_url text,
   items jsonb NOT NULL DEFAULT '[]'::jsonb,
   twitter_id text,
   staff_twitter text,
   is_absent boolean NOT NULL DEFAULT false,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.circle_info
+  ADD COLUMN IF NOT EXISTS cut_image_url text;
 
 ALTER TABLE public.circle_info ENABLE ROW LEVEL SECURITY;
 
